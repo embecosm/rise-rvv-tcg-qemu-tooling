@@ -338,7 +338,6 @@ then
       exit 1
     fi
 fi
-#      --with-qemu-src=$TOPDIR/qemu \
 
 if ! ${qemu_only}
 then
