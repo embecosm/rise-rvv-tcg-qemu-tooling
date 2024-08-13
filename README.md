@@ -72,6 +72,12 @@ tool chains as follows:
 - GDB 14.2
 - Glibc 2.39
 
+## Adding SPEC CPU 2017
+
+[SPEC CPU 2017](https://www.spec.org/cpu2017/) must be obtained independently
+(it is not free).  It should be placed manually in the `specpu2017` directory
+at the top level (i.e. as a peer to this directory).
+
 ## Building QEMU
 
 QEMU can be built using the `--build-all.sh` script.
@@ -96,3 +102,127 @@ The `--build-clang` option will also build a Clang/LLVM tool chain.  The
 
 Various other options can be used to fine-tune the build.  You can use the
 `--help` option to see all these.
+
+## SPEC CPU 2017 benchmarks under QEMU
+
+### Design of the scripts to run SPEC CPU 2017 under QEMU
+
+SPEC CPU 2017 really assumes it is running native.  It is not perfectly set up
+for running on a remote target.  We could run QEMU in system mode, but this
+would necessitate running all the commands to build the QEMU benchmarks under
+QEMU, which would be slow.
+
+So we choose to build the benchmarks on the host machine using the RISC-V
+cross-compiler, and then run them under QEMU in application mode. In order to
+do this we use the standard standard SPEC CPU 2017 `runcpu` command to build
+the benchmarks, with the SPEC CPU `submit` configuration option inserting QEMU
+commands for execution.
+
+We then use `runcpu` to perform a _dummy_ run of the benchmarks. With an awk
+script, we can then extract the commands to run the benchmarks and check their
+results afterwards.  We then run all these scripts in parallel, waiting until
+they have all completed.  We use the QEMU `libinsn` plugin to count the number
+of instructions executed by each run.  We record statistics of how many
+benchmarks built correctly and then ran correctly.
+
+Postprocessing scripts (see below) are then used to extract the results.
+
+### Running the SEPC CPU 2017 benchmarks under QEMU
+
+The script `runspec-qemu.sh` runs the benchmarks.  The most important options
+are as follows.
+
+- `--lto` or `--no-lto`. Indicates whether the benchmarks should be built
+  using LTO or now.  Default `--no-lto`
+- `--vector` or `--no-vector`.  Indicates whether the benchmarks should be
+  built for the RISC-V Vector (RVV) extension.  Default `no-vector`.
+- `--benchmarks <list>`.  Indicates the set of benchmarks to use.  This can be
+  a space separated list of benchmarks, but for convenience the following
+  lists are defined:
+  - `dummy` - just the four `specrand` benchmarks;
+  - `quick` - `602.gcc_s`, `623.xalancbmk_s` and `998.specrand_is`;
+  - `intrate` - the SPEC CPU 2017 integer rate benchmarks;
+  - `fprate` - the SPEC CPU 2017 floating point rate benchmarks;
+  - `intspeed` - the SPEC CPU 2017 integer speed benchmarks;
+  - `fpspeed` - the SPEC CPU 2017 floating point speed benchmarks;
+  - `rate` - all the SPEC CPU 2017 rate benchmarks;
+  - `speed` - all the SPEC CPU 2017 speed benchmarks; and
+  - `all` - all the benchmarks.
+- `--size test|train|ref`.  The size of datasets to use.  Full runs should use
+  the `ref` datasets, but depending on the size of your server can take 2-3 days
+  to complete. Most benchmarking for this project uses the `test` datasets.
+- `--help`.  Print details of all options to the script.
+
+There are many options to tune SPEC CPU 2017.  However, since the purpose of
+this project is to improve QEMU, not tune SPEC CPU 2017, we do not generally
+use them.
+
+The script will produce messages as it progresses.  At the end it will report
+on how many benchmarks built correctly and how many ran correctly.  Finally it
+will print the name of the full log file.  This file will be used later by the
+scripts to report metrics.
+
+### Choice of metrics
+
+SPEC CPU 2017 is designed to work with timings, not instruction counts.  To
+facilitate the standard scripts, we convert instruction counts to a nominal
+time, by treating QEMU as a machine which can execute 10<sup>9</sup>
+instructions per second.
+
+But the point of the project is to know how fast QEMU is running.  We time
+each benchmark run (some benchmarks have more than one run, using different
+datasets).  This is our first QEMU metric.
+
+More usefully we divide this time by the number of instructions executed.
+This gives us an average execution time per instruction.  The goal of this
+project is to reduce this time, and bring the average time when running with
+vector enabled closed to that without vector enabled.
+
+### Scripts to extract results
+
+To get the SPEC CPU 2017 scores, we use the `calc-spec-qemu.sh` script.
+```
+./calc-spec-qemu.sh --speclog <logfile>
+```
+where `<logfile>` is the log file reported at the end of the `runspec-qemu.sh`
+run. The output is a table with a line for each benchmark showing the official
+baseline time (in seconds), the number of QEMU instructions executed, and the
+SPEC Ratio, computed on the basis of 10<sup>9</sup> instruction being executed
+per second.  There are a number of options to control the format of the output.
+
+- `--md` - produce output as a MarkDown table
+- `--csv` - produce output as a CSV file
+
+The default is to produce plain text output.
+
+To get the timing data we use the `dump-qemu-times.sh` script.
+```
+./dump-qemu-times.sh --speclog <logfile>
+```
+
+This will provide a table of real, user and system times for each benchmark.
+As with `calc-spec-qemu.sh` scripts, the `--md` and `--csv` options control
+output format.  In addition, the `--verbose` option will print additional
+tables with a break down of timings for each invididual benchmark run.
+
+### Post processing
+
+At present, post processing is up to the user, typically using a spreadsheet
+(CSV output is useful).  When working out QEMU times, we use the sum of user
+and system time.  Real time is of less use, since it is too affected by
+external factors.
+
+### Sanity checks
+
+When comparing different versions of QEMU, the results from
+`calc-spec-qemu.sh` should be the same, or at least very similar. There can be
+small variations due to timing differences when interacting with the operating
+system, random number generation and the like.
+
+### Known limitations
+
+The script generation from the dummy SPEC CPU 2017 run is not yet perfect.
+Some of the scripts used are not to be run on the target platform, but on the
+host.  Thus some benchmarks may fail their checks, when in fact they have
+executed correctly.  Further work is needed to fix this.
+ 
