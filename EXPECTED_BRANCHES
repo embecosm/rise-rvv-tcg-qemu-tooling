@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# This file defines the branches that the build script should
+# check for and which the checkout and clone scripts use. It is
+# sourced by other scripts.
+#
+# Copyright (C) 2022 Embecosm Limited
+
+# Contributor: Edward Jones  <ed.jones@embecosm.com>
+
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+BINUTILS_BRANCH=binutils-2_42
+GDB_BRANCH=gdb-14.2-release
+GCC_BRANCH=releases/gcc-14.1.0
+LLVM_BRANCH=llvmorg-18.1.5
+GLIBC_BRANCH=glibc-2.39
+TOOLCHAIN_BRANCH=master
+QEMU_BRANCH=master
