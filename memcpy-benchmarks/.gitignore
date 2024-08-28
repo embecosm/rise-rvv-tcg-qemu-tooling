@@ -1,0 +1,5 @@
+# Compilation artifacts
+*.o
+*.exe
+*.icount
+*.check
