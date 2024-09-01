@@ -3,3 +3,12 @@
 *.exe
 *.icount
 *.check
+# Generated data
+*.csv
+*.res
+perf.data
+perf.data.old
+gmon.out
+# Standard directories for generated data
+res-baseline
+res-development

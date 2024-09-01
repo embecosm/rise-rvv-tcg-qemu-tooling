@@ -1,2 +1,16 @@
+# Git comparison files
+*.diff
+*.patch
+*.orig
+*.rej
 # Editor backup files
 *~
+# Generated logs and results files
+*.log
+*.res
+*.csv
+# Generated graphics
+*.png
+bm-graph-all-*/
+# Dump files
+*.dump

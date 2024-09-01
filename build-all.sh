@@ -15,9 +15,16 @@ usage () {
     cat <<EOF
 Usage ./build-all.sh                      : Build riscv64-unknown-linux-gnu
                                             tool chain and QEMU (default)
-                     [--only-qemu]        : Build just QEMU
+                     [--build-qemu]       : Build qemu-riscv32 and qemu-riscv64
                      [--build-clang]      : Build Clang/LLVM
                      [--build-gdbserver]  : Build gdbserver
+		     [--qemu-only]        : Only build qemu
+		     [--qemu-configs]     : Additional QEMU config otions
+		     [--qemu-cflags]      : CFLAGS for building QEMU (default
+                                            "-Wno-error")
+                     [--profile-qemu]     : Enable profiling by gperf
+                     [--prefix <path>]    : Install path of the tool chain.
+                                            Default path is ../install
                      [--arch <arch>]      : Target architecture. Default
                                             architecture is rv64gc
                      [--abi <abi>]        : Target ABI. Default ABI is lp64d
@@ -33,6 +40,7 @@ Usage ./build-all.sh                      : Build riscv64-unknown-linux-gnu
                      [--clean]            : Delete build directories in
                                             riscv-gnu-toolchain and the install
                                             directory before building
+                     [--clean-qemu]       : Clean just the QEMU build
                      [--help]             : Print this message and exit
 EOF
 }
@@ -51,9 +59,13 @@ DEFAULTTRIPLE=riscv64-unknown-elf
 
 build_linux=true
 qemu_only=false
+qemu_configs=""
+qemu_cflags=""
+profile_qemu=""
 build_gdbserver=false
 build_clang=false
 clean_build=false
+clean_qemu_build=false
 enable_multilib=true
 print_help=false
 print_hashes=false
@@ -110,6 +122,17 @@ until
       --qemu-only)
 	  qemu_only=true
 	  ;;
+      --qemu-configs)
+	  shift
+	  qemu_configs="$1"
+	  ;;
+      --qemu-cflags)
+	  shift
+	  qemu_cflags="$1"
+	  ;;
+      --profile-qemu)
+	  profile_qemu="--enable-gprof"
+	  ;;
       --build-gdbserver)
 	  build_gdbserver=true
 	  ;;
@@ -156,6 +179,10 @@ until
 	  ;;
       --clean)
 	  clean_build=true
+	  clean_qemu_build=true
+	  ;;
+      --clean-qemu)
+	  clean_qemu_build=true
 	  ;;
       --help)
 	  print_help=true
@@ -267,6 +294,15 @@ else
   EXTRA_OPTS="${EXTRA_OPTS} --disable-multilib"
 fi
 echo "  build qemu: yes"
+echo "   qemu_configs: ${qemu_configs}"
+echo "   qemu_cflags: ${qemu_cflags}"
+if ${clean_qemu_build}
+then
+   echo "   qemu_clean: yes"
+else
+   echo "   qemu_clean: no"
+fi
+
 if ${build_gdbserver}
 then
   echo "  build gdbserver: yes"
@@ -283,7 +319,7 @@ fi
 cd $TOPDIR/riscv-gnu-toolchain
 
 log_file="${LOGDIR}/clean-toolchain.log"
-if ${clean_build}
+if ${clean_build} && ! ${qemu_only}
 then
   echo
   echo "Cleaning...                            logging to ${log_file}"
@@ -362,8 +398,14 @@ echo "Building QEMU...                 logging to ${log_file}"
   $TOPDIR/qemu/configure --prefix=$INSTALLDIR \
 	  --target-list=riscv64-linux-user,riscv32-linux-user \
 	  --interp-prefix=$INSTALLDIR/sysroot \
-	  --python=python3 \
-	  --extra-cflags="-Wno-error"
+	  --python=python3 ${profile_qemu} \
+	  ${qemu_configs} \
+	  --extra-cflags="${qemu_cflags}"
+  if ${clean_build} || ${clean_qemu_build}
+  then
+      rm -f ${INSTALLDIR}/bin/qemu-riscv??
+      make clean
+  fi
   make -j $(nproc)
   make install
 ) > ${log_file} 2>&1
