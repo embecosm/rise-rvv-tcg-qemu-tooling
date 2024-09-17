@@ -24,8 +24,9 @@ Usage ./profile-all-funcs.sh  : Extract function performance data
 EOF
 }
 
-topdir="$(cd $(dirname $(dirname $(dirname $(readlink -f $0)))) ; pwd)"
-memcpydir=${topdir}/tooling/memcpy-benchmarks
+tooldir="$(cd $(dirname $(dirname $(readlink -f $0))) ; pwd)"
+topdir="$(cd $(dirname ${tooldir}) ; pwd)"
+memcpydir="${tooldir}/memcpy-benchmarks"
 
 # Default values
 resdir="${memcpydir}/res-baseline"
@@ -85,7 +86,8 @@ set -u
 
 # Temporary file for intermediaries
 tmpf="$(mktemp profile-all-funcs-XXXXXX)"
-tmpcsv="$(mktemp profile-all-funcs-XXXXXX.csv)"
+tmpcsv1="$(mktemp profile-all-funcs-XXXXXX-1.csv)"
+tmpcsv2="$(mktemp profile-all-funcs-XXXXXX-2.csv)"
 
 # Find out the sizes
 cd ${resdir}
@@ -105,6 +107,7 @@ cd ${memcpydir}
 for l in ${dlens}
 do
     res_title="${res_title}#${l}"
+    echo -n .
     ./extract-top-level-funcs.sh --md \
 	--resfile ${resdir}/prof-${restype}-${l}.res > ${tmpf}
 
@@ -137,17 +140,21 @@ do
 	reslist[${f}]="${reslist[${f}]}#${res}"
     done
 done
+echo
 
-# Print it all out
-res_title="${res_title}%"
-echo "${res_title}" | sed -e 's/%/"/g' -e 's/#/","/g' > ${tmpcsv}
+# Print it all out.  Prep the body of the CSV, sort it by function name, then
+# transpose it.
 for f in ${funclist}
 do
     reslist[${f}]="${reslist[${f}]}%"
-    echo "${reslist[${f}]}" | sed -e 's/%/"/g' -e 's/#/","/g' >> ${tmpcsv}
+    echo "${reslist[${f}]}" | sed -e 's/%/"/g' -e 's/#/","/g' >> ${tmpcsv1}
 done
 
-csvtool transpose ${tmpcsv}
+res_title="${res_title}%"
+echo "${res_title}" | sed -e 's/%/"/g' -e 's/#/","/g' > ${tmpcsv2}
+sort -t, -k1 < ${tmpcsv1} >> ${tmpcsv2}
+csvtool transpose ${tmpcsv2}
 
 rm -f ${tmpf}
-rm -f ${tmpcsv}
+rm -f ${tmpcsv1}
+rm -f ${tmpcsv2}

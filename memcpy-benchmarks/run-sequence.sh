@@ -5,30 +5,59 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-iterations=1000000
-length=1
-fullrun="no"
+# Defaults
+iterations=10000000
+vlens="128 256 512 1024"
+data_lens="  1 \
+             2 \
+             3 \
+             4 \
+             5 \
+             7 \
+             8 \
+             9 \
+            16 \
+            25 \
+            27 \
+            32 \
+            49 \
+            64 \
+            81 \
+           125 \
+           128 \
+           243 \
+           256 \
+           343 \
+           512 \
+           625 \
+           729 \
+          1024 \
+          2048 \
+          2401 \
+          3125 \
+          4096 \
+          6561 \
+          8192 \
+         15625"
 format="--md"
-print_help=false
-debug_mode=false
-vlen_list=(
-128
-256
-512
-1024
-)
-vlen_list_arg=""
 lmul=8
 benchmark="memcpy"
 
 usage () {
     cat <<EOF
-Usage ./build-all.sh [--iter] <iterations>	: Number of iterations of the tests
-		     [--vlen-list] <vlen-list>	: Comma separated list of values for the RVV VLEN parameter
-		     [--lmul] <lmul>		: RVV LMUL parameter
-                     [--full | --concise]	: How many data sizes to use
-		     [--csv | --md]		: Format of table
-                     [--help]			: Print this message and exit
+Usage ./build-all.sh [--iter <num>]   : Number of iterations of the tests.
+                                        Default 1000000
+		     [--vlens <list>] : Space separated list of values for the
+                                        RVV VLEN parameter. Default "128 256
+                                        512 1024"
+		     [--lmul <lmul>]  : RVV LMUL parameter. Default 8
+                     [--dlens <list>] : Space separated list of data sizes to
+                                        use.
+		     [--csv | --md]   : Format of table
+                     [--help]	      : Print this message and exit
+
+The default list of data points is 1 and all the powers of 2, 3, 5 and 7 up to
+5^6.
 EOF
 }
 
@@ -41,13 +70,17 @@ until
           shift
 	  iterations="$1"
 	  ;;
-      --vlen-list)
+      --vlens)
           shift
-	  vlen_list_arg="$1"
+	  vlens="$1"
 	  ;;
       --lmul)
           shift
 	  lmul="$1"
+	  ;;
+      --dlens)
+          shift
+	  data_lens="$1"
 	  ;;
       --full)
 	  fullrun="yes"
@@ -58,18 +91,17 @@ until
       --md|--csv)
 	  format="$1"
 	  ;;
-      --debug)
-	  debug_mode=true
-	  ;;
       --benchmark)
 	  shift
 	  benchmark="$1"
 	  ;;
       --help)
-	  print_help=true
+	  usage
+	  exit 0
 	  ;;
       ?*)
 	  echo "Unknown argument '$1'"
+	  usage
 	  exit 1
 	  ;;
       *)
@@ -81,111 +113,12 @@ do
 done
 set -u
 
-if ${print_help}
+# Build the binaries once
+if ! make > /dev/null 2>&1
 then
-    usage
+    echo "ERROR: run-sequence.sh: Failed to build binaries"
     exit 1
 fi
-
-if [[ -n $vlen_list_arg ]]
-then
-  IFS=',' read -r -a vlen_list <<< "$vlen_list_arg"
-fi
-
-if [[ "${fullrun}" = "yes" ]]
-then
-    data_lengths=(
-	    1
-	    2
-	    3
-	    4
-	    5
-	    6
-	    7
-	    8
-	    9
-	   10
-	   11
-	   12
-	   13
-	   14
-	   15
-	   16
-	   17
-	   18
-	   19
-	   20
-	   21
-	   22
-	   23
-	   24
-	   25
-	   26
-	   27
-	   28
-	   29
-	   30
-	   31
-	   32
-	   33
-	   34
-	   35
-	   43
-	   49
-	   50
-	   51
-	   52
-	   53
-	   59
-	   60
-	   61
-	   62
-	   63
-	   64
-	   65
-	   66
-	   67
-	   79
-	  127
-	  128
-	  129
-	  130
-	  131
-	  132
-	  133
-	  197
-	  256
-	  281
-	  512
-	  613
-	 1024
-	 1579
-	 2048
-	 2897
-	 4096
-	 5081
-	 8192
-	 9103
-)
-else
-	data_lengths=(
-	    1
-	    2
-	    4
-	    8
-	   16
-	   32
-	   64
-	  128
-	  256
-	  512
-	 1024
-	 2048
-)
-fi
-
-# Build the binaries once
-make
 
 rm -rf vmem.check
 rm -rf smem.check
@@ -195,19 +128,17 @@ if [[ "${lmul}" != "1" ]]
 then
   if [[ "${format}" == "--md" ]]
   then
-      printf "Iterations: %d\n\n" ${iterations}
-      printf "| %5s | %6s | %7s | %7s | %7s | %10s | %10s | %10s | %10s | %10s | %11s|\n" \
-	   "VLEN" "length" "s time" "v1 time" "v$lmul time" \
+      printf "| %10s | %5s | %6s | %7s | %7s | %7s | %10s | %10s | %10s | %10s | %10s | %11s|\n" \
+	   "Iterations" "VLEN" "length" "s time" "v1 time" "v$lmul time" \
 	   "s Micount" "v1 Micount" "v$lmul Micount" \
 	   "s ns/inst" "v1 ns/inst" "v$lmul ns/inst"
-      printf "| %5s | %6s | %7s | %7s | %7s | %10s | %10s | %10s | %10s | %10s | %11s|\n" \
-	   "----:" "-----:" "------:" "------:" "------:" \
+      printf "| %10s | %5s | %6s | %7s | %7s | %7s | %10s | %10s | %10s | %10s | %10s | %11s|\n" \
+	   "---------:" "----:" "-----:" "------:" "------:" "------:" \
 	   "---------:" "---------:" "---------:" \
 	   "---------:" "---------:" "----------:"
   else
-      printf "\"Iterations\",\"%d\"\n" ${iterations}
-      printf "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n" \
-	   "VLEN" "length" "s time" "v1 time" "v$lmul time" \
+      printf "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n" \
+	   "Iterations" "VLEN" "length" "s time" "v1 time" "v$lmul time" \
 	   "s Micount" "v1 Micount" "v$lmul Micount" \
 	   "s ns/inst" "v1 ns/inst" "v$lmul ns/inst"
   fi
@@ -215,18 +146,18 @@ else
   if [[ "${format}" == "--md" ]]
   then
       printf "Iterations: %d\n\n" ${iterations}
-      printf "| %5s | %6s | %7s | %7s | %10s | %10s | %10s | %10s |\n" \
-	   "VLEN" "length" "s time" "v1 time" \
+      printf "| %10s | %5s | %6s | %7s | %7s | %10s | %10s | %10s | %10s |\n" \
+	   "Iterations" "VLEN" "length" "s time" "v1 time" \
 	   "s Micount" "v1 Micount" \
 	   "s ns/inst" "v1 ns/inst"
-      printf "| %5s | %6s | %7s | %7s | %10s | %10s | %10s | %10s |\n" \
-	   "----:" "-----:" "------:" "------:" \
+      printf "| %10s | %5s | %6s | %7s | %7s | %10s | %10s | %10s | %10s |\n" \
+	   "---------:" "----:" "-----:" "------:" "------:" \
 	   "---------:" "---------:" \
 	   "---------:" "---------:"
   else
       printf "\"Iterations\",\"%d\"\n" ${iterations}
-      printf "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n" \
-	   "VLEN" "length" "s time" "v1 time" \
+      printf "\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n" \
+	   "Iterations" "VLEN" "length" "s time" "v1 time" \
 	   "s Micount" "v1 Micount" \
 	   "s ns/inst" "v1 ns/inst"
   fi
@@ -235,11 +166,13 @@ fi
 # Do all the runs, but the scalar runs only once
 scalar_flag="--scalar"
 
-for vlen in ${vlen_list[@]}
+for vlen in ${vlens}
 do
-    for l in ${data_lengths[@]}; do
-	./run-${benchmark}.sh ${format} ${scalar_flag} --iter $iterations --len $l \
-			--vlen ${vlen} --lmul ${lmul}
+    for l in ${data_lens}
+    do
+	iters=$((iterations / l))
+	./run-${benchmark}.sh ${format} ${scalar_flag} --iter $iters \
+	      --len $l --vlen ${vlen} --lmul ${lmul}
     done
     scalar_flag="--no-scalar"
 done

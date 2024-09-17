@@ -23,8 +23,9 @@ Usage ./extract-top-level-funcs.sh : Extract list of top level functions
 EOF
 }
 
-topdir="$(cd $(dirname $(dirname $(dirname $(readlink -f $0)))) ; pwd)"
-memcpydir=${topdir}/tooling/memcpy-benchmarks
+tooldir="$(cd $(dirname $(dirname $(readlink -f $0))) ; pwd)"
+topdir="$(cd $(dirname ${tooldir}) ; pwd)"
+memcpydir="${tooldir}/memcpy-benchmarks"
 
 # Default values
 resfile=
@@ -85,17 +86,6 @@ fi
 # Temporary file, so we can sort the results
 tmpf=$(mktemp extract-top-level-funcs-XXXXXX)
 
-case "${format}"
-in
-    --md)
-	printf "| %8s | %8s | %-45s |\n" "Children" "Self" "Function/address"
-	printf "| %8s | %8s | %-45s |\n" "-------:" "-------:" \
-	       ":--------------------------------------------"
-	;;
-    --csv)
-	printf '"%s","%s","%s"\n' "Children" "Self" "Function/address"
-esac
-
 while IFS='' read -r line
 do
     if (echo "${line}" | grep -q '\[\.\] [^[:space:]]\+$')
@@ -139,25 +129,37 @@ do
 	# greater than pctot)
 	if [[ "$(echo "${pctot}" | sed -e 's/\...$//')" -lt ${cutoff} ]]
 	then
-	    # Sort the results if necessary
-	    if ${dototal}
-	    then
-		cat < ${tmpf}
-	    else
-		# Need to sort
-		case "${format}"
-		in
-		    --md)
-			sort -nr -t'|' -k3  < ${tmpf}
-			;;
-		    --csv)
-			sort -nr -t'"' -k4  < ${tmpf}
-			;;
-		esac
-	    fi
-
-	    rm ${tmpf}
-	    exit 0
+	    break
 	fi
     fi
 done < ${resfile}
+
+# Print the results, sorting if necessary
+case "${format}"
+in
+    --md)
+	printf "| %8s | %8s | %-45s |\n" "Children" "Self" "Function/address"
+	printf "| %8s | %8s | %-45s |\n" "-------:" "-------:" \
+	       ":--------------------------------------------"
+	;;
+    --csv)
+	printf '"%s","%s","%s"\n' "Children" "Self" "Function/address"
+esac
+
+if ${dototal}
+then
+    cat < ${tmpf}
+else
+    # Need to sort
+    case "${format}"
+    in
+	--md)
+	    sort -nr -t'|' -k3  < ${tmpf}
+	    ;;
+	--csv)
+	    sort -nr -t'"' -k4  < ${tmpf}
+	    ;;
+    esac
+fi
+
+rm ${tmpf}

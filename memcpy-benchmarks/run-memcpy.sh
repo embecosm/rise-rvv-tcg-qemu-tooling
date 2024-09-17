@@ -182,26 +182,26 @@ if [[ $lmul != "1" ]]
 then
   if [[ ${format} == "--md" ]]
   then
-      printf "| %5d | %6d | %7.2f | %7.2f | %7.2f | %10.1f | %10.1f | %10.1f | %10.2f | %10.2f | %10.2f |\n" \
-	   ${vlen} $length $scalar_time $vector1_time $vectorM_time \
-	   ${scalar_micount} ${vector1_micount} ${vectorM_micount} \
-	   ${scalar_nspi} ${vector1_nspi} ${vectorM_nspi}
+      printf "| %10d | %5d | %6d | %7.2f | %7.2f | %7.2f | %10.1f | %10.1f | %10.1f | %10.2f | %10.2f | %10.2f |\n" \
+	     ${iterations} ${vlen} $length $scalar_time $vector1_time \
+	     $vectorM_time ${scalar_micount} ${vector1_micount} \
+	     ${vectorM_micount} ${scalar_nspi} ${vector1_nspi} ${vectorM_nspi}
   else
-      printf "\"%d\",\"%d\",\"%.2f\",\"%.2f\",\"%.2f\",\"%.1f\",\"%.1f\",\"%.1f\",\"%.2f\",\"%.2f\",\"%.2f\"\n" \
-	   ${vlen} $length $scalar_time $vector1_time $vectorM_time \
-	   ${scalar_micount} ${vector1_micount} ${vectorM_micount} \
-	   ${scalar_nspi} ${vector1_nspi} ${vectorM_nspi}
+      printf "\"%d\",\"%d\",\"%d\",\"%.2f\",\"%.2f\",\"%.2f\",\"%.1f\",\"%.1f\",\"%.1f\",\"%.2f\",\"%.2f\",\"%.2f\"\n" \
+	     ${iterations} ${vlen} $length $scalar_time $vector1_time \
+	     $vectorM_time ${scalar_micount} ${vector1_micount} \
+             ${vectorM_micount} ${scalar_nspi} ${vector1_nspi} ${vectorM_nspi}
   fi
 else
   if [[ ${format} == "--md" ]]
   then
-      printf "| %5d | %6d | %7.2f | %7.2f | %10.1f | %10.1f | %10.2f | %10.2f |\n" \
-	   ${vlen} $length $scalar_time $vector1_time \
+      printf "| %10d | %5d | %6d | %7.2f | %7.2f | %10.1f | %10.1f | %10.2f | %10.2f |\n" \
+	   ${iterations} ${vlen} $length $scalar_time $vector1_time \
 	   ${scalar_micount} ${vector1_micount} \
 	   ${scalar_nspi} ${vector1_nspi}
   else
-      printf "\"%d\",\"%d\",\"%.2f\",\"%.2f\",\"%.1f\",\"%.1f\",\"%.2f\",\"%.2f\"\n" \
-	   ${vlen} $length $scalar_time $vector1_time \
+      printf "\"%d\",\"%d\",\"%d\",\"%.2f\",\"%.2f\",\"%.1f\",\"%.1f\",\"%.2f\",\"%.2f\"\n" \
+	   ${iterations} ${vlen} $length $scalar_time $vector1_time \
 	   ${scalar_micount} ${vector1_micount} \
 	   ${scalar_nspi} ${vector1_nspi}
   fi

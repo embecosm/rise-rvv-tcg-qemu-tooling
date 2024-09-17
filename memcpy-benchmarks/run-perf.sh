@@ -14,8 +14,7 @@ usage () {
 Usage: ./run-perf.sh       : Run Linux perf on memcpy benchmarks
           [--bytes <num>]  : Total bytes to copy.  Default 1,000,000,000
           [--resdir <dir>] : Directory in which to place the results.  Default
-                             is "res-baseline" in the directory holding this
-			     script.
+                             is the directory holding this script.
           [--sizes <list>] : Space separated list of the data sizes to use when
                              creating results.  Default list is all the powers
                              of 2, 3, 5 and 7 up to 5^6
@@ -34,11 +33,11 @@ accurate results, but is slow.  Expect each iteration to take of the order of
 EOF
 }
 
-memcpydir="$(cd $(readlink -f $0) ; pwd)"
+memcpydir="$(cd $(dirname $(readlink -f $0)) ; pwd)"
 
 # Default values
 bytes="1000000000"
-resdir="${memcpydir}/res-baseline"
+resdir="${memcpydir}"
 data_lens="  1 \
              2 \
              3 \
@@ -104,6 +103,8 @@ do
   shift
 done
 set -u
+
+mkdir -p "${resdir}"
 
 for dlen in ${data_lens}
 do
