@@ -10,3 +10,5 @@
 
 extern void  mem_init_random (uint8_t *ptr, size_t len);
 extern void  mem_init_zero (uint8_t *ptr, size_t len);
+extern void  str_init_random (char *str, size_t len);
+extern void  str_init_const (char *str, size_t len, const char c);

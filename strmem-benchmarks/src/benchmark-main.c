@@ -53,9 +53,14 @@ main (int argc, char* argv[])
       iters = (size_t) strtoul(argv[2], NULL, 0);
     }
 
+  /* Make random seeding explicit (this is in fact implicit). */
+  srand (1);
+
+  /* The benchmark wrapper for whatever the target is */
   benchmark_wrapper (size, iters);
 
 #ifdef VERIF
+  /* Optional verification code */
   if (! benchmark_verify (size, iters))
     {
       printf ("ERROR: Verification failed\n");

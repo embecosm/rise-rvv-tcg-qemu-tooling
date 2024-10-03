@@ -17,6 +17,9 @@ Usage ./run-all-benchmarks.sh
                                (see below)
     [--verify | --no-verify] : Verify the results (default --no-verify)
     [--qemulist <list>]      : List of QEMU commits to test (see below)
+    [--build | --no-build]   : Build (or not) QEMU (default --build).
+                               --no-build is only meaningful if --qemulist has
+                               a single entry.
     [--target-time <num>]    : Target time for any one run (default 10s)
     [--warmup <num>]         : # iterations for warmup (default 1)
     [--sizelist <list>]      : Space separated list of sizes to use (see below)
@@ -42,15 +45,15 @@ around 1s of execution).  The default list is:
   memcpy-10000000
   memmove-10000000
   memset-12000000
-  strcat-1000000
-  strchr-1000000
-  strcmp-1000000
-  strcpy-1000000
-  strlen-1000000
-  strncat-1000000
-  strncmp-1000000
-  strncpy-1000000
-  strnlen-1000000
+  strcat-3000000
+  strchr-50000
+  strcmp-6000000
+  strcpy-5000000
+  strlen-9000000
+  strncat-3000000
+  strncmp-6000000
+  strncpy-4000000
+  strnlen-5000000
 
 The default size list is 1 and then all powers of 2, 3, 5, 7 & 11 less than
 100,000.
@@ -58,6 +61,9 @@ The default size list is 1 and then all powers of 2, 3, 5, 7 & 11 less than
 The default QEMU commits are the standard library (i.e. no RVV), the last
 commit before the start of the project (#a0c325c4b0) and the latest RISE QEMU
 project commit at the time of writing this script (#7809b7fafb).
+
+The use of --no-build is really only of use when debugging.  It should not
+normally be used.
 EOF
 }
 
@@ -80,18 +86,19 @@ bmlist="memchr-300000      \
         memcpy-10000000    \
         memmove-10000000   \
         memset-12000000    \
-        strcat-1000000     \
-        strchr-1000000     \
-        strcmp-1000000     \
-        strcpy-1000000     \
-        strlen-1000000     \
-        strncat-1000000    \
-        strncmp-1000000    \
-        strncpy-1000000    \
-        strnlen-1000000"
+        strcat-3000000     \
+        strchr-50000       \
+        strcmp-6000000     \
+        strcpy-5000000     \
+        strlen-9000000     \
+        strncat-3000000    \
+        strncmp-6000000    \
+        strncpy-4000000    \
+        strnlen-5000000"
 verify="--no-verify"
 qemulist="a0c325c4b0 \
           7809b7fafb"
+dobuild=true
 conflist="stdlib 128-1 1024-8"
 target_time=10
 warmup=1
@@ -161,6 +168,12 @@ until
       --qemulist)
 	  shift
 	  qemulist="$1"
+	  ;;
+      --build)
+	  dobuild=true
+	  ;;
+      --no-build)
+	  dobuild=false
 	  ;;
       --conflist)
 	  shift
@@ -244,17 +257,21 @@ echo "Conf list       : ${conflist}"        >> ${logfile} 2>&1
 # Do each commit in turn
 for c in ${qemulist}
 do
-    echo "Checking out QEMU commit ${c}..." 2>&1 | tee -a ${logfile}
-    date 2>&1 | tee -a ${logfile}
-    pushd ${qemudir} > /dev/null 2>&1
-    git checkout ${c} >> ${logfile} 2>&1
-    popd > /dev/null 2>&1
+    # Build QEMU - this is the default
+    if ${dobuild}
+    then
+	echo "Checking out QEMU commit ${c}..." 2>&1 | tee -a ${logfile}
+	date 2>&1 | tee -a ${logfile}
+	pushd ${qemudir} > /dev/null 2>&1
+	git checkout ${c} >> ${logfile} 2>&1
+	popd > /dev/null 2>&1
 
-    echo "Building QEMU for commit ${c}..." 2>&1 | tee -a ${logfile}
-    date 2>&1 | tee -a ${logfile}
-    pushd ${tooldir} > /dev/null 2>&1
-    ./build-all.sh --qemu-only --clean-qemu >> ${logfile} 2>&1
-    popd > /dev/null 2>&1
+	echo "Building QEMU for commit ${c}..." 2>&1 | tee -a ${logfile}
+	date 2>&1 | tee -a ${logfile}
+	pushd ${tooldir} > /dev/null 2>&1
+	./build-all.sh --qemu-only --clean-qemu >> ${logfile} 2>&1
+	popd > /dev/null 2>&1
+    fi
 
     # QEMU plugin directory varies
     if [[ -e "${qemubuilddir}/tests/plugin/libinsn.so" ]]

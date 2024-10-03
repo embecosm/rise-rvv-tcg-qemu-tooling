@@ -302,7 +302,13 @@ do
     prev_size=${size}
     if ! csvtool namedcol "Time" "${tmpcsv}" > /dev/null 2>&1
     then
-	echo "ERROR: Bad ${tmpcsv} for size ${size}"
+	if [[ "x${stdlib}" == "x--stdlib" ]]
+	then
+	    n="${benchmark}-stdlib"
+	else
+	    n="${benchmark}-${vlen}-m${lmul}"
+	fi
+	    echo "ERROR: ${n}: Bad ${tmpcsv} or ${tmpexedir} for size ${size}"
 	exit 1
     fi
     prev_t=$(csvtool namedcol "Time" "${tmpcsv}" | csvtool drop 1 -)
