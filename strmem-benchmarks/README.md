@@ -20,6 +20,13 @@ strncpy
 strnlen
 ```
 
+## Prequisites
+
+To run the benchmarking script you will need:
+- Python 3.10 or later
+- Gnuplot 5 or later
+- Pandoc 2.9 or later
+
 ## About the benchmarksing
 
 For each benchmarked function, we are comparing a "baseline" QEMU against a
@@ -45,13 +52,18 @@ measure the efficiency of QEMU.  Each graph shows this metric, plotted against
 problem size, one line for the "baseline" version of QEMU, the other the
 "latest" QEMU.
 
-This report is generated entirely automatically using the command
+Ensure a standard GCC 14.1 tool chain is on your path.  You can then run the
+benchmarks and generate a PDF report using the following:
 ```
-./run-all-benchmarks.sh
+./run-all-benchmarks.py --qemulist <commit> <commit>
 ```
+Where the arguments are two commits of QEMU you wish to compare, with the
+first being presented in the report as the "baseline".  There are numerous
+parameters to control the detail of the benchmarking.  Use the `--help` option
+to see them.
 
-This takes less than 20 minutes to run on a 40 thread AMD Threadripper 1950X
-at 3.4GHz.  The code is in the `strmem-benchmarks` directory of the
+A full run takes less than 20 minutes to run on a 40 thread AMD Threadripper
+1950X at 3.4GHz.  The code is in the `strmem-benchmarks` directory of the
 [rise-rvv-tcg-qemu-tooling](https://github.com/embecosm/rise-rvv-tcg-qemu-tooling)
 repository.  It is intended to be portable, but to date has only been tested
 on Ubuntu 22.04 LTS.

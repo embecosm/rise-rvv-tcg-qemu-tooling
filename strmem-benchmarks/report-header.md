@@ -1,8 +1,8 @@
 # RISE QEMU function benchmarks
 These are hand-written versions of common memory and string library functions
 provided by SiFive Inc.  For each benchmarked function, we are comparing a
-"baseline" QEMU against a "latest" QEMU.  We look at three versions of the
-code.
+"baseline" QEMU against a "latest" QEMU.  By default, we look at three
+versions of the code.
 
 1. the standard library "scalar" implementation of the function
 2. the hand-written vector code for VLEN=128 and LMUL=1 ("small vector")
@@ -25,9 +25,11 @@ problem size, one line for the "baseline" version of QEMU, the other the
 "latest" QEMU.
 
 This report is generated entirely automatically using the command
+
 ```
-./run-all-benchmarks.sh
+./run-all-benchmarks.py
 ```
+
 This takes less than 20 minutes to run on a 40 thread AMD Threadripper 1950X
 at 3.4GHz.  The code is in the `strmem-benchmarks` directory of the
 [rise-rvv-tcg-qemu-tooling](https://github.com/embecosm/rise-rvv-tcg-qemu-tooling)

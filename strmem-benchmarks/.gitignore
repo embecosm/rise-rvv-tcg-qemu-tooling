@@ -1,0 +1,11 @@
+# Old stuff
+old/*
+# Generated directories
+logs/
+graphs/
+build/
+__pycache__/
+# Generated reports
+report-20*.pdf
+# Intermediate temporary files
+icount-*

@@ -235,5 +235,6 @@ gnuplot -e "benchmark='${benchmark}'" \
 	-e "ipi_range='${ipi_range}'" \
         plot-one-benchmark.gnuplot
 
-ps2pdf -sPAGESIZE=a4 ${benchmark}.ps ${benchmark}.pdf
+mkdir -p graphs
+ps2pdf -sPAGESIZE=a4 ${benchmark}.ps graphs/${benchmark}.pdf
 rm ${benchmark}.ps
