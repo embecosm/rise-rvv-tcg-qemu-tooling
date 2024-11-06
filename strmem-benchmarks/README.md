@@ -26,6 +26,7 @@ To run the benchmarking script you will need:
 - Python 3.10 or later
 - Gnuplot 5 or later
 - Pandoc 2.9 or later
+- csvtool (needed for plotting)
 
 ## About the benchmarksing
 
@@ -55,7 +56,7 @@ problem size, one line for the "baseline" version of QEMU, the other the
 Ensure a standard GCC 14.1 tool chain is on your path.  You can then run the
 benchmarks and generate a PDF report using the following:
 ```
-./run-all-benchmarks.py --qemulist <commit> <commit>
+./run_all_benchmarks.py --qemulist <commit> <commit>
 ```
 Where the arguments are two commits of QEMU you wish to compare, with the
 first being presented in the report as the "baseline".  There are numerous

@@ -16,7 +16,6 @@ Benchmarking common procedures.
 import logging
 import os
 import sys
-import time
 
 
 # What we export
@@ -24,7 +23,6 @@ import time
 __all__ = [
     'Log',
     'check_python_version',
-    'arglist_to_str',
 ]
 
 
@@ -34,10 +32,9 @@ class Log:
         self.__log = logging.getLogger()
 
     def __create_logdir(self, logdir):
-        """Create the log directory, which can be relative to the root directory
-           or absolute"""
+        """Create the log directory, which we make absolute"""
         if not os.path.isabs(logdir):
-            logdir = os.path.join(gp['rootdir'], logdir)
+            logdir = os.path.abspath(logdir)
 
             if not os.path.isdir(logdir):
                 try:
@@ -74,23 +71,28 @@ class Log:
         self.__log.addHandler(file_h)
 
         # Log where the log file is
-        self.__log.debug(f'Log file: {logfile}\n')
+        self.__log.debug('Log file: %s', logfile)
         self.__log.debug('')
 
-    def critical(self, str):
-        self.__log.critical(str)
+    def critical(self, *args):
+        """Wrapper for the underlying log critical method."""
+        self.__log.critical(*args)
 
-    def error(self, str):
-        self.__log.error(str)
+    def error(self, *args):
+        """Wrapper for the underlying log error method."""
+        self.__log.error(*args)
 
-    def warning(self, str):
-        self.__log.warning(str)
+    def warning(self, *args):
+        """Wrapper for the underlying log warning method."""
+        self.__log.warning(*args)
 
-    def info(self, str):
-        self.__log.info(str)
+    def info(self, *args):
+        """Wrapper for the underlying log info method."""
+        self.__log.info(*args)
 
-    def debug(self, str):
-        self.__log.debug(str)
+    def debug(self, *args):
+        """Wrapper for the underlying log debug method."""
+        self.__log.debug(*args)
 
 
 # Make sure we have new enough python.  This is will predate logging being set
@@ -102,38 +104,3 @@ def check_python_version(major, minor):
         print(f'ERROR: Requires Python {major}.{minor} or later',
               file=sys.stderr)
         sys.exit(1)
-
-def log_args(args):
-    """Record all the argument values"""
-    log.debug('Supplied arguments')
-    log.debug('==================')
-
-    for arg in vars(args):
-        realarg = re.sub('_', '-', arg)
-        val = getattr(args, arg)
-        log.debug('--{arg:20}: {val}'.format(arg=realarg, val=val))
-
-    log.debug('')
-
-
-def log_benchmarks(benchmarks):
-    """Record all the benchmarks in the log"""
-    log.debug('Benchmarks')
-    log.debug('==========')
-
-    for bench in benchmarks:
-        log.debug(bench)
-
-    log.debug('')
-
-
-def arglist_to_str(arglist):
-    """Make arglist into a string"""
-
-    for arg in arglist:
-        if arg == arglist[0]:
-            str = arg
-        else:
-            str = str + ' ' + arg
-
-    return str

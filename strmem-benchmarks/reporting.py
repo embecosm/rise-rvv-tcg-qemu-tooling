@@ -12,15 +12,10 @@
 We have a set of CSV files from which we report.
 """
 
-#import concurrent.futures
-#import csv
 import os
 import os.path
-#import re
-#import resource
 import shutil
 import subprocess
-#import sys
 import tempfile
 import textwrap
 
@@ -77,27 +72,27 @@ class Reporter:
                 cwd=self._args.get('strmemdir'),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
             )
         except subprocess.TimeoutExpired as e:
             self._log.error(
-                f'ERROR: Version extraction timed out.')
+                'ERROR: Version extraction timed out.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
-            fh.write(f'Not available: timed out.\n')
+            fh.write('Not available: timed out.\n')
         except subprocess.CalledProcessError as e:
             self._log.error(
-                f'ERROR: Version extraction failed.')
+                'ERROR: Version extraction failed.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
-            fh.write(f'Not available: failed.\n')
+            fh.write('Not available: failed.\n')
         else:
-            fh.write(f'```\n')
+            fh.write('```\n')
             lines = textwrap.fill(res.stdout.decode('utf-8'), width=width,
                                   break_on_hyphens=False)
             fh.write(f'{lines}\n')
-            fh.write(f'```\n')
+            fh.write('```\n')
 
     def _report_main(self, omitlist):
         """Generate the main section of the report.  Return the PDF file
@@ -120,30 +115,30 @@ class Reporter:
             return None
 
         # Now open to append the specifics
-        with open(tmpmd, mode="a") as fh:
+        with open(tmpmd, mode="a", encoding="utf-8") as fh:
             datestamp = self._args.get('datestamp')
             user = os.getlogin()
             fh.write(f'- Datestamp: {datestamp}\n')
             fh.write(f'- User: {user}\n\n')
-            fh.write(f'## Functions to be benchmarked\n\n')
-            fh.write(f'Any functions which failed to benchmark are noted.\n\n')
+            fh.write('## Functions to be benchmarked\n\n')
+            fh.write('Any functions which failed to benchmark are noted.\n\n')
             for bm in self._args.get('bmlist'):
                 if bm in omitlist:
                     fh.write(f'- {bm} **(failed)**\n\n')
                 else:
                     fh.write(f'- {bm}\n\n')
-            fh.write(f'## QEMU versions\n\n')
+            fh.write('## QEMU versions\n\n')
             for cmt in self._args.get('qemulist'):
                 fh.write(f'- {cmt}\n\n')
-            fh.write(f'## Tool chain configuration\n\n')
-            fh.write(f'GCC configuration\n')
+            fh.write('## Tool chain configuration\n\n')
+            fh.write('GCC configuration\n')
             self._report_version('riscv64-unknown-linux-gnu-gcc -v', fh, 105)
-            fh.write(f'Assembler version\n')
+            fh.write('Assembler version\n')
             self._report_version('riscv64-unknown-linux-gnu-as -v < /dev/null',
                                  fh, 105)
-            fh.write(f'Linker version\n')
+            fh.write('Linker version\n')
             self._report_version('riscv64-unknown-linux-gnu-ld -v', fh, 105)
-            fh.write(f'Glibc version\n')
+            fh.write('Glibc version\n')
             ldd = os.path.join(self._args.get('installdir'), 'sysroot', 'usr',
                                               'bin', 'ldd')
             self._report_version(f'{ldd} --version -v', fh, 105)
@@ -158,21 +153,24 @@ class Reporter:
                 cwd=self._args.get('strmemdir'),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
             )
         except subprocess.TimeoutExpired as e:
-            self._log.error(
-                f'ERROR: Pandoc timed out.')
+            self._log.error('ERROR: Pandoc timed out.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
             self._log.debug(e.stderr)
             return None
         except subprocess.CalledProcessError as e:
-            self._log.error(
-                f'ERROR: Pandoc failed.')
+            self._log.error('ERROR: Pandoc failed.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
+            return None
+        else:
+            if res.returncode == 0:
+                return tmppdf
+
             return None
         finally:
             # The markdown file can now be deleted.
@@ -181,8 +179,6 @@ class Reporter:
             except Exception as e:
                 self._log.debug(
                     'Debug: Unable to delete temporary Markdown {tmpmd}')
-            finally:
-                return tmppdf
 
     def _plotpdf(self, bm):
         """Generate graph for the specified benchmark.  Return the PDF file
@@ -213,28 +209,31 @@ class Reporter:
                 cwd=self._args.get('strmemdir'),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
             )
         except subprocess.TimeoutExpired as e:
-            self._log.error(
-                f'ERROR: Plotting timed out.')
+            self._log.error(f'ERROR: Plotting {bm} timed out.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
             self._log.debug(e.stderr)
             return None
         except subprocess.CalledProcessError as e:
-            self._log.error(
-                f'ERROR: Plotting failed.')
+            self._log.error(f'ERROR: Plotting {bm} failed.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
             return None
-        else:
-            return os.path.join(self._args.get('strmemdir'), 'graphs',
-                                f'{bm}.pdf')
 
+        if res.returncode != 0:
+            self._log.error(f'ERROR: Plotting {bm} failed: {res}.')
+            self._log.debug(cmd)
+            self._log.debug(res.stdout.decode('utf-8'))
+            self._log.debug(res.stderr.decode('utf-8'))
+            return None
 
-    def genReport(self):
+        return os.path.join(self._args.get('strmemdir'), 'graphs', f'{bm}.pdf')
+
+    def gen_report(self):
         """Generate the report.  For now we only report with two QEMU commits
            and three configs ."""
         self._log.info('Generating report')
@@ -288,24 +287,27 @@ class Reporter:
                 cwd=self._args.get('strmemdir'),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
             )
         except subprocess.TimeoutExpired as e:
-            self._log.error(
-                f'ERROR: PDF combining timed out.')
+            self._log.error('ERROR: PDF combining timed out.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
             self._log.debug(e.stderr)
             return False
         except subprocess.CalledProcessError as e:
-            self._log.error(
-                f'ERROR: PDF combining failed.')
+            self._log.error('ERROR: PDF combining failed.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
             return False
-        else:
-            self._log.info(f'Report in {reportfile}')
+
+        if res.returncode != 0:
+            self._log.error('ERROR: PDF combining failed.')
+            self._log.debug(cmd)
+            return False
+
+        self._log.info(f'Report in {reportfile}')
 
         # Clean up
         try:
@@ -314,3 +316,5 @@ class Reporter:
         except Exception as e:
             self._log.debug(
                 'Debug: Unable to delete temporary PDF {tmppdf}')
+
+        return True

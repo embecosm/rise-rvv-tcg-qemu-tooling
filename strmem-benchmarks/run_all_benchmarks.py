@@ -14,15 +14,12 @@
 It is based on a generic Embecosm framework for such benchmarking.
 """
 
-import concurrent.futures
-import os
 import sys
 
 from support import Log
 from support import check_python_version
 from parseargs import ParseArgs
 from qemutools import QEMUBuilder
-from modeling import Model
 from modeling import ModelSet
 from reporting import Reporter
 
@@ -46,7 +43,7 @@ def main():
         res.generate_csv()
     # Report the results
     rpt = Reporter(ModelSet, args, log)
-    rpt.genReport()
+    rpt.gen_report()
 
 # Make sure we have new enough Python and only run if this is the main package
 check_python_version(3, 10)

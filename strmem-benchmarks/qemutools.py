@@ -46,7 +46,8 @@ class QEMUBuilder:
         self._build_qemu()
         self.qemuplugin = self._find_qemu_plugin()
         if not self.qemuplugin:
-            log.error(f'ERROR: Unable to find QEMU plugin for {self._suffix}')
+            log.error(
+                f'ERROR: Unable to find QEMU plugin for commit {self.cmt}')
             sys.exit(1)
 
     def _checkout(self):
@@ -61,7 +62,7 @@ class QEMUBuilder:
                 cwd=self._args.get('qemudir'),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
                 )
         except subprocess.TimeoutExpired as e:
@@ -78,6 +79,11 @@ class QEMUBuilder:
             self._log.debug(e.stdout)
             self._log.debug(e.stderr)
             sys.exit(1)
+        else:
+            if not res:
+                self._log.error(
+                    f'ERROR: Checkout of QEMU commit {self.cmt} failed.')
+                sys.exit(1)
 
     def _clean(self):
         """Prepare a clean build.  Since they are used for nothing else, we
@@ -87,13 +93,14 @@ class QEMUBuilder:
         try:
             shutil.rmtree(self.builddir, ignore_errors=True)
         except Exception as e:
-            ename=type(e)._name_
+            ename=type(e).__name__
             self._log.error(
                 f'ERROR: Clean of QEMU build dir {self.builddir} failed: {ename}.')
             sys.exit(1)
         try:
             shutil.rmtree(self.installdir, ignore_errors=True)
         except Exception as e:
+            ename=type(e).__name__
             self._log.error(
                 f'ERROR: Clean of QEMU install dir {self.installdir} failed: {ename}.')
             sys.exit(1)
@@ -126,7 +133,7 @@ class QEMUBuilder:
                 cwd=self.builddir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
                 )
             self._log.debug(res.stdout.decode('utf-8'))
@@ -158,7 +165,7 @@ class QEMUBuilder:
                 cwd=self.builddir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=600,
+                timeout=10 * self._args.get('timeout'),
                 check=True,
                 )
             self._log.debug(res.stdout.decode('utf-8'))
@@ -185,7 +192,7 @@ class QEMUBuilder:
                 cwd=self.builddir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
                 )
             self._log.debug(res.stdout.decode('utf-8'))
@@ -214,7 +221,7 @@ class QEMUBuilder:
            build.  Any failures terminate the program.
 
            If no-build is requested, we check the binaries are there."""
-        if (self._args.get('build')):
+        if self._args.get('build'):
             self._checkout()
             self._clean()
             self._configure()
@@ -237,4 +244,3 @@ class QEMUBuilder:
 
         self._log.error('ERROR: QEMU plugin not found.')
         return None
-

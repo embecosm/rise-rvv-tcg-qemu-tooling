@@ -51,7 +51,7 @@ find_max () {
 
 # Function to run its argument under python
 runpy () {
-    echo "${1}" | python
+    echo "${1}" | python3
 }
 
 # Find an appropriate range for the supplied argument. Add 20% and then 

@@ -13,7 +13,6 @@ A module to parse arguments for the SiFive benchmarks
 """
 
 import argparse
-import logging
 import os
 import os.path
 import sys
@@ -48,18 +47,18 @@ class ParseArgs:
         # When we run
         datestamp = time.strftime('%Y-%m-%d-%H-%M-%S')
         # Some default lists (and choices) for convenience
-        BMLIST_DFT = ['memchr', 'memcmp', 'memcpy', 'memmove', 'memset',
+        bmlist_dft = ['memchr', 'memcmp', 'memcpy', 'memmove', 'memset',
                       'strcat', 'strchr', 'strcmp', 'strcpy', 'strlen',
                       'strncat', 'strncmp', 'strncpy', 'strnlen',]
-        SIZELIST_DFT = [    1,     2,     3,     4,     5,     7,
+        sizelist_dft = [    1,     2,     3,     4,     5,     7,
                             8,     9,    11,    16,    25,    27,
                            32,    49,    64,    81,   121,   125,
                           128,   243,   256,   343,   512,   625,
                           729,  1024,  1331,  2048,  2401,  3125,
                          4096,  6561,  8192, 14641, 15625, 16384,
                         16807, 19683, 32768, 59049, 65536, 78125,]
-        CONFLIST_DFT = ['stdlib', '128-1', '1024-8']
-        CONFLIST_CHOICES = ['stdlib',
+        conflist_dft = ['stdlib', '128-1', '1024-8']
+        conflist_choices = ['stdlib',
                              '128-1',  '128-2',  '128-4',  '128-8',
                              '256-1',  '256-2',  '256-4',  '256-8',
                              '512-1',  '512-2',  '512-4',  '512-8',
@@ -113,7 +112,8 @@ class ParseArgs:
             type=str,
             default=installdir_dft,
             metavar='DIR',
-            help='Main directory for installing programs for the benchmarking (default: %(default)s)',
+            help='Main directory for installing programs ' \
+                 'for the benchmarking (default: %(default)s)',
         )
         parser.add_argument(
             '--sifivesrcdir',
@@ -132,9 +132,9 @@ class ParseArgs:
         parser.add_argument(
             '--bmlist',
             type=str,
-            default=BMLIST_DFT,
+            default=bmlist_dft,
             nargs='*',
-            choices=BMLIST_DFT,
+            choices=bmlist_dft,
             metavar='BENCHMARK',
             help='Benchmarks to run (default: %(default)s)',
         )
@@ -203,7 +203,7 @@ class ParseArgs:
         parser.add_argument(
             '--sizelist',
             type=int,
-            default=SIZELIST_DFT,
+            default=sizelist_dft,
             nargs='*',
             metavar='NUM',
             help='Sizes of data to use (default: %(default)s)',
@@ -211,9 +211,9 @@ class ParseArgs:
         parser.add_argument(
             '--conflist',
             type=str,
-            default=CONFLIST_DFT,
+            default=conflist_dft,
             nargs='*',
-            choices=CONFLIST_CHOICES,
+            choices=conflist_choices,
             metavar='VLEN-LMUL',
             help='VLEN-LMUL configurations to run (default: %(default)s)',
         )

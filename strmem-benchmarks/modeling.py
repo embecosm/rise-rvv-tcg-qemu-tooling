@@ -97,22 +97,20 @@ class Model:
             self._stdlib = True
             self._vlen = 128
             self._lmul = 1
-            self._suffix = self._cmt + '-' + bm + '-' + 'stdlib'
+            self.suffix = self._cmt + '-' + bm + '-' + 'stdlib'
         else:
             self._stdlib = False
             self._vlen, self._lmul = conf.split('-')
-            self._suffix = self._cmt + '-' + bm + '-' + self._vlen + \
+            self.suffix = self._cmt + '-' + bm + '-' + self._vlen + \
                 '-m' + self._lmul
         self.builddir = os.path.join(args.get('strmemdir'), 'build',
-                                     'bd-' + self._suffix)
+                                     'bd-' + self.suffix)
         self._bmexe = os.path.join(
             self.builddir, 'benchmark-' + self._bm + '.exe')
         self._resdir = self._args.get('resdir')
-        self._resfile = os.path.join(self._resdir, self._suffix + '.csv')
+        self._resfile = os.path.join(self._resdir, self.suffix + '.csv')
         self.buildok = False
         self.results = {}
-        currpath=os.environ['PATH']
-        os.environ['PATH'] = f'{qb.installdir}/bin:{currpath}'
         self._setup()
 
     def _setup(self):
@@ -122,7 +120,7 @@ class Model:
         """
         for dirname in [self.builddir, self._resdir]:
             # Delete any existing directory
-            self._log.debug(f'DEBUG: Cleaning {self._suffix}')
+            self._log.debug(f'DEBUG: Cleaning {self.suffix}')
             try:
                 shutil.rmtree(dirname, ignore_errors=True)
             except Exception as e:
@@ -153,7 +151,7 @@ class Model:
     def build(self):
         """Build the executables for this configuration.  Return true on
            success."""
-        self._log.debug(f'DEBUG: Building {self._suffix}')
+        self._log.debug(f'DEBUG: Building {self.suffix}')
         if self._args.get('verify'):
             verify_flag='-DVERIF'
         else:
@@ -174,19 +172,19 @@ class Model:
                 cwd=self.builddir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
                 )
         except subprocess.TimeoutExpired as e:
             self._log.error(
-                f'ERROR: Benchmark build for {self._suffix} timed out.')
+                f'ERROR: Benchmark build for {self.suffix} timed out.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
             self._log.debug(e.stderr)
             self.buildok = False
         except subprocess.CalledProcessError as e:
             self._log.error(
-                f'ERROR: Benchmark build for {self._suffix} failed.')
+                f'ERROR: Benchmark build for {self.suffix} failed.')
             self._log.debug(e.cmd)
             self._log.debug(e.stdout)
             self._log.debug(e.stderr)
@@ -201,15 +199,15 @@ class Model:
         """Extract the instruction count from a file."""
         nlines = 0
         icnt = 0
-        with open(filename, 'r') as file:
+        with open(filename, 'r', encoding="utf-8") as file:
             for line in file:
-                insns = re.search('total insns: (\d+)', line.strip())
+                insns = re.search(r'total insns: (\d+)', line.strip())
                 if insns:
                     icnt = int(insns.group(1))
                     nlines += 1
 
         if nlines > 1:
-            mess = f'{nlines} line in icount for {self._suffix}'
+            mess = f'{nlines} line in icount for {self.suffix}'
             self._log.warning(f'Warning: {mess}')
 
         return icnt
@@ -235,25 +233,28 @@ class Model:
             ename = type(e).__name__
             confstr = f'self._prefix, size={sz}, iters={iters}'
             self._log.error(f'ERROR: {estr} for {confstr}: {ename}.')
-            return None;
+            return None
 
+        # Add QEMU to path
+        currpath=os.environ['PATH']
+        os.environ['PATH'] = f'{self._qb.installdir}/bin:{currpath}'
         usage_start = resource.getrusage(resource.RUSAGE_CHILDREN)
         cmd = f'qemu-riscv64 -cpu rv64,v=true,vlen={self._vlen} ' + \
 	      f'--d plugin -plugin {self._qemuplugin},inline=on ' + \
               f'-D {tmpf} {self._bmexe} {sz} {iters}'
         try:
-            res = subprocess.run(
+            subprocess.run(
                 cmd,
                 shell=True,
                 executable='/bin/bash',
                 cwd=self.builddir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=60,
+                timeout=self._args.get('timeout'),
                 check=True,
                 )
         except subprocess.TimeoutExpired as e:
-            wmess = f'Benchmark run for {self._suffix}'
+            wmess = f'Benchmark run for {self.suffix}'
             self._log.warning(
                 f'Warning: {wmess}, size={sz}, iters={iters} timed out.')
             self._log.debug(e.cmd)
@@ -261,7 +262,7 @@ class Model:
             self._log.debug(e.stderr)
             return None
         except subprocess.CalledProcessError as e:
-            wmess = f'Benchmark run for {self._suffix}'
+            wmess = f'Benchmark run for {self.suffix}'
             self._log.warning(
                 f'Warning: {wmess}, size={sz}, iters={iters} failed.')
             self._log.debug(e.cmd)
@@ -273,6 +274,7 @@ class Model:
             return self._qemu_res(usage_start, usage_end, tmpf)
         finally:
             try:
+                os.environ['PATH'] = f'{currpath}'
                 os.remove(tmpf)
             except Exception as e:
                 self._log.debug('Debug: Unable to delete temporary {tmpf}')
@@ -287,22 +289,22 @@ class Model:
         res_warmup = self._run_qemu(sz, warmup_iters)
         if not res_warmup:
             return None
-        else:
-            t_warmup, icnt_warmup = res_warmup
+
+        t_warmup, icnt_warmup = res_warmup
         res_tot = self._run_qemu(sz, tot_iters)
         if not res_tot:
             return None
-        else:
-            t_tot, icnt_tot = res_tot
+
+        t_tot, icnt_tot = res_tot
 
         return (iters, t_tot - t_warmup, icnt_tot - icnt_warmup)
 
     def run(self):
         """Run the models for all the different sizes.  Return the list of
            results on success, None on failure."""
-        self._log.debug(f'DEBUG: Running {self._suffix}: {self.buildok}')
+        self._log.debug(f'DEBUG: Running {self.suffix}: {self.buildok}')
         if not self.buildok:
-            self._log.debug(f'DEBUG: No build to run {self._suffix}')
+            self._log.debug(f'DEBUG: No build to run {self.suffix}')
             return None
 
         # Mark progress as successful and get the baseline icount and timing
@@ -332,7 +334,7 @@ class Model:
 
     def export_csv(self):
         """Export our results to a CSV file."""
-        with open(self._resfile, 'w', newline='') as csvf:
+        with open(self._resfile, 'w', newline='', encoding="utf-8") as csvf:
             csvwriter = csv.writer(csvf, dialect=csv.unix_dialect)
             # Write the header
             csvwriter.writerow(['Benchmark', 'Iterations', 'VLEN', 'LMUL',
@@ -391,7 +393,7 @@ class ModelSet:
                 else:
                     failures +=1
             except Exception as e:
-                emess = f'Building model'
+                emess = 'Building model'
                 ename = type(e).__name__
                 self._log.error(f'ERROR: {emess}: {ename}.')
                 failures += 1
@@ -436,7 +438,7 @@ class ModelSet:
                 else:
                     failures +=1
             except Exception as e:
-                emess = f'running model config {self._suffix}'
+                emess = f'running model config {m.suffix}'
                 ename = type(e).__name__
                 self._log.error(f'ERROR: {emess}: {ename}.')
                 failures += 1
