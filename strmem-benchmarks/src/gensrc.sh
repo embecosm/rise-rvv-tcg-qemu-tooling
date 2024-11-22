@@ -65,16 +65,11 @@ then
     exit 1
 fi
 
-tmpsrc="$(mktemp gensrc-tmpXXXXXX.S)"
-
 src="${benchmark}_vext.S"
-sed < "${sifivesrcdir}/${src}" -e '/#define ELEM_LMUL_SETTING/d' > ${tmpsrc}
-gcc -E -I"${sifivesrcdir}" "${tmpsrc}" | \
-    sed -e 's/ELEM_LMUL_SETTING/LMUL/' -e 's/^    /\t/' \
+gcc -E -I"${sifivesrcdir}" "${sifivesrcdir}/${src}" | \
+    sed -e 's/^    /\t/' \
 	-e 's/; .align/\n\t.align/' -e 's/; .type/\n\t.type/' \
 	-e 's/.cfi_endproc; /\t.cfi_endproc\n\t/' -e 's/; /\n/' \
 	-e 's/;$//' -e 's/^.globl/\t.globl/' -e '/^# /d' \
 	-e 's/\(^\t[^ ]\{1,7\}\) \+/\1\t/' \
 	-e "s/${benchmark}/${benchmark}_v/g" > "${src}"
-
-rm -f "${tmpsrc}"

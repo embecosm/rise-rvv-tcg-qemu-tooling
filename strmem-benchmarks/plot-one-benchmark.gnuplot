@@ -45,13 +45,13 @@ plot old_scalar_csv using (column("Size")):(column("Icnt/iter")) \
      new_scalar_csv using (column("Size")):(column("Icnt/iter")) \
      title new_qemu." scalar" with lines ls 102, \
      old_small_vector_csv using (column("Size")):(column("Icnt/iter")) \
-     title old_qemu." small vector" with lines ls 103, \
+     title old_qemu." VLEN=128" with lines ls 103, \
      new_small_vector_csv using (column("Size")):(column("Icnt/iter")) \
-     title new_qemu." small vector" with lines ls 104, \
+     title new_qemu." VLEN=128" with lines ls 104, \
      old_large_vector_csv using (column("Size")):(column("Icnt/iter")) \
-     title old_qemu." large vector" with lines ls 105, \
+     title old_qemu." VLEN=1024" with lines ls 105, \
      new_large_vector_csv using (column("Size")):(column("Icnt/iter")) \
-     title new_qemu." large vector" with lines ls 106
+     title new_qemu." VLEN=1024" with lines ls 106
 
 set title "scalar QEMU instruction timings"
 set yrange [0:scalar_nspi_range]
@@ -61,7 +61,7 @@ plot old_scalar_csv using (column("Size")):(column("ns/inst")) \
      new_scalar_csv using (column("Size")):(column("ns/inst")) \
      title new_qemu with lines ls 102
 
-set title "VLEN=128, LMUL=1 (small vector) QEMU instruction timings"
+set title "VLEN=128 QEMU instruction timings"
 set yrange [0:small_vector_nspi_range]
 set ylabel "ns/instr"
 plot old_small_vector_csv using (column("Size")):(column("ns/inst")) \
@@ -69,7 +69,7 @@ plot old_small_vector_csv using (column("Size")):(column("ns/inst")) \
      new_small_vector_csv using (column("Size")):(column("ns/inst")) \
      title new_qemu with lines ls 102
 
-set title "VLEN=1024, LMUL=8 (large vector) QEMU instruction timings"
+set title "VLEN=1024 QEMU instruction timings"
 set yrange [0:large_vector_nspi_range]
 set ylabel "ns/instr"
 plot old_large_vector_csv using (column("Size")):(column("ns/inst")) \

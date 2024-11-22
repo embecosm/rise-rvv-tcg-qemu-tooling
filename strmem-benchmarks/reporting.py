@@ -47,18 +47,13 @@ class Reporter:
             self.results[cmt] = {}
             for bm in self._args.get('bmlist'):
                 self.results[cmt][bm] = {}
-                for conf in self._args.get('conflist'):
-                    if conf == 'stdlib':
-                        resname = f'{cmt}-{bm}-{conf}.csv'
-                    else:
-                        vlen, lmul = conf.split('-')
-                        resname = f'{cmt}-{bm}-{vlen}-m{lmul}.csv'
-
+                for vlen in self._args.get('vlenlist'):
+                    resname = f'{cmt}-{bm}-{vlen}.csv'
                     resfile = os.path.join(resdir, resname)
                     if os.path.exists(resfile):
-                        self.results[cmt][bm][conf] = resfile
+                        self.results[cmt][bm][vlen] = resfile
                     else:
-                        self.results[cmt][bm][conf] = None
+                        self.results[cmt][bm][vlen] = None
                         self._log.debug(f'DEBUG: Did not find {resfile}')
 
     def _report_version(self, cmd, fh, width):
@@ -186,21 +181,21 @@ class Reporter:
         cmtlist = self._args.get('qemulist')
         oldqemu = cmtlist[0]
         newqemu = cmtlist[1]
-        conflist = self._args.get('conflist')
-        conf1 = conflist[0]
-        conf2 = conflist[1]
-        conf3 = conflist[2]
+        vlenlist = self._args.get('vlenlist')
+        vlen1 = vlenlist[0]
+        vlen2 = vlenlist[1]
+        vlen3 = vlenlist[2]
         plotcmd=os.path.join(self._args.get('strmemdir'),
                              'plot-one-benchmark.sh')
         cmd = f'{plotcmd} --benchmark "{bm}" ' \
             f'--old-qemu "baseline (#{oldqemu}))" ' \
             f'--new-qemu "latest (#{newqemu})" ' \
-	    f'--old-scalar-data "{self.results[oldqemu][bm][conf1]}" ' \
-	    f'--new-scalar-data "{self.results[newqemu][bm][conf1]}" ' \
-	    f'--old-small-vector-data "{self.results[oldqemu][bm][conf2]}" ' \
-	    f'--new-small-vector-data "{self.results[newqemu][bm][conf2]}" ' \
-	    f'--old-large-vector-data "{self.results[oldqemu][bm][conf3]}" ' \
-	    f'--new-large-vector-data "{self.results[newqemu][bm][conf3]}"'
+	    f'--old-scalar-data "{self.results[oldqemu][bm][vlen1]}" ' \
+	    f'--new-scalar-data "{self.results[newqemu][bm][vlen1]}" ' \
+	    f'--old-small-vector-data "{self.results[oldqemu][bm][vlen2]}" ' \
+	    f'--new-small-vector-data "{self.results[newqemu][bm][vlen2]}" ' \
+	    f'--old-large-vector-data "{self.results[oldqemu][bm][vlen3]}" ' \
+	    f'--new-large-vector-data "{self.results[newqemu][bm][vlen3]}"'
         try:
             res = subprocess.run(
                 cmd,
@@ -240,7 +235,7 @@ class Reporter:
         if len(self._args.get('qemulist')) != 2:
             self._log.warning('Warning: Can only report with two QEMU commits.')
             return False
-        if len(self._args.get('conflist')) != 3:
+        if len(self._args.get('vlenlist')) != 3:
             self._log.warning('Warning: Can only report with three configs.')
             return False
 
@@ -249,12 +244,12 @@ class Reporter:
         omitlist = []
 
         cmtlist = self._args.get('qemulist')
-        conflist = self._args.get('conflist')
+        vlenlist = self._args.get('vlenlist')
         for bm in self._args.get('bmlist'):
             canplot = True
             for cmt in cmtlist:
-                for conf in conflist:
-                    if not self.results[cmt][bm][conf]:
+                for vlen in vlenlist:
+                    if not self.results[cmt][bm][vlen]:
                         canplot = False
             if canplot:
                 plotpdf = self._plotpdf(bm)

@@ -29,29 +29,41 @@ __all__ = [
 ]
 
 class QEMUBuilder:
-    """A class to build a QEMU instance from a particular commit.
+    """A class to build a pair of QEMU instances from a particular commit.
+
+       We build one with plugins enabled and one without.
 
        The install and build paths are derived from the generic install and
        build paths passed as arguments.
     """
     def __init__(self, cmt, args, log):
         """Constructor for the builder, which actually does the building."""
-        suffix = 'qemu-' + str(cmt)
+        base_suffix = 'qemu-' + str(cmt) + '-'
+        base_bd = args.get('builddir')
+        base_id = args.get('installdir')
         self.cmt = cmt
         self._args = args
         self._log = log
-        self.builddir = os.path.join(args.get('builddir'), suffix)
-        self.installdir = os.path.join(args.get('installdir'), suffix)
-        self._log.info(f'Building QEMU commit {self.cmt}')
-        self._build_qemu()
+        self.builddir = {}
+        self.installdir = {}
+        # Build plugin and no plugin versions.  Only checkout once
+        do_checkout = True
+        for plt in ['plugin', 'no-plugin']:
+            self.builddir[plt] = os.path.join(base_bd, base_suffix + plt)
+            self.installdir[plt] = os.path.join(base_id, base_suffix + plt)
+            self._log.info(f'Building QEMU commit {self.cmt} {plt} version')
+            self._build_qemu(plt, do_checkout)
+
+        # Only have a QEMU plugin in one case
         self.qemuplugin = self._find_qemu_plugin()
         if not self.qemuplugin:
-            log.error(
-                f'ERROR: Unable to find QEMU plugin for commit {self.cmt}')
+            emess = 'ERROR: Unable to find QEMU plugin'
+            log.error(f'{emess} for commit {self.cmt} {plt} version')
             sys.exit(1)
 
     def _checkout(self):
-        """Checkout the desired QEMU commit. Give up on failure."""
+        """Checkout the desired QEMU commit. Give up on failure.
+        """
         self._log.debug(f'DEBUG: Checking out QEMU commit {self.cmt}')
         cmd = f'git checkout {self.cmt}'
         try:
@@ -85,52 +97,63 @@ class QEMUBuilder:
                     f'ERROR: Checkout of QEMU commit {self.cmt} failed.')
                 sys.exit(1)
 
-    def _clean(self):
-        """Prepare a clean build.  Since they are used for nothing else, we
-           can just delete the build and install directories if they exist.
+    def _clean(self, plt):
+        """Prepare a clean build.  Argument supplied is 'plugin' or
+           'no-plugin'.  Since they are used for nothing else, we can just
+           delete the build and install directories if they exist.
            Give up on failure."""
         self._log.debug(f'DEBUG: Cleaning QEMU commit {self.cmt}')
         try:
-            shutil.rmtree(self.builddir, ignore_errors=True)
+            shutil.rmtree(self.builddir[plt], ignore_errors=True)
         except Exception as e:
             ename=type(e).__name__
             self._log.error(
-                f'ERROR: Clean of QEMU build dir {self.builddir} failed: {ename}.')
+                emess = 'ERROR: Clean of QEMU build dir'
+                f'{emess} {self.builddir[plt]} failed: {ename}.')
             sys.exit(1)
         try:
-            shutil.rmtree(self.installdir, ignore_errors=True)
+            shutil.rmtree(self.installdir[plt], ignore_errors=True)
         except Exception as e:
             ename=type(e).__name__
+            emess = 'ERROR: Clean of QEMU install dir'
             self._log.error(
-                f'ERROR: Clean of QEMU install dir {self.installdir} failed: {ename}.')
+                f'{emess} {self.installdir[plt]} failed: {ename}.')
             sys.exit(1)
 
-    def _configure(self):
-        """Configure the desired QEMU commit. Give up on failure."""
-        self._log.debug(f'DEBUG: Configuring QEMU commit {self.cmt}')
+    def _configure(self, plt):
+        """Configure the desired QEMU commit.  Argument supplied is 'plugin'
+           or 'no-plugin', which controls how we configure the build.  Give up
+           on failure."""
+        dmess = 'DEBUG: Configuring QEMU'
+        self._log.debug(f'{dmess} commit {self.cmt} {plt} version')
         # Create the build directory.
         try:
-            os.makedirs(self.builddir, exist_ok=True)
+            os.makedirs(self.builddir[plt], exist_ok=True)
         except FileNotFoundError:
             self._log.error(
-                f'ERROR: Unable to create QEMU build dir {self.builddir}.')
+                emess = 'ERROR: Unable to create QEMU build dir'
+                f'{emess} {self.builddir[plt]}.')
             sys.exit(1)
 
         # Configure in the build directory
         configure=os.path.join(self._args.get('qemudir'), 'configure')
         sysroot_prefix=os.path.join(self._args.get('installdir'), 'sysroot')
         extra_cflags=self._args.get('qemu_cflags')
-        cmd = f'{configure} --prefix={self.installdir} ' \
+        if plt == 'plugin':
+            pluginconf = '--enable-plugins'
+        else:
+            pluginconf = '--disable-plugins'
+        cmd = f'{configure} --prefix={self.installdir[plt]} ' \
               f'--target-list=riscv64-linux-user,riscv32-linux-user ' \
               f'--interp-prefix={sysroot_prefix} --disable-docs ' \
-              f'--extra-cflags="{extra_cflags}"' + \
+              f'{pluginconf} --extra-cflags="{extra_cflags}"' + \
               ' '.join(self._args.get('qemu_config'))
         try:
             res = subprocess.run(
                 cmd,
                 shell=True,
                 executable='/bin/bash',
-                cwd=self.builddir,
+                cwd=self.builddir[plt],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=self._args.get('timeout'),
@@ -138,23 +161,27 @@ class QEMUBuilder:
                 )
             self._log.debug(res.stdout.decode('utf-8'))
         except subprocess.TimeoutExpired as e:
+            emess = 'ERROR: Configure of QEMU commit'
             self._log.error(
-                f'ERROR: Configure of QEMU commit {self.cmt} timed out.')
+                f'{emess} {self.cmt} {plt} version timed out.')
             self._log.debug(e.stdout)
             self._log.debug(e.stderr)
             sys.exit(1)
         except subprocess.CalledProcessError as e:
+            emess = 'ERROR: Configure of QEMU commit'
             self._log.error(
-                f'ERROR: Configure of QEMU commit {self.cmt} failed.')
+                f'{emess} {self.cmt} {plt} version failed.')
             self._log.debug(f'Return code {e.returncode}')
             self._log.debug(' '.join(e.cmd))
             self._log.debug(e.stdout)
             self._log.debug(e.stderr)
             sys.exit(1)
 
-    def _build(self):
-        """Build the configured QEMU, giving up on failure"""
-        self._log.debug(f'DEBUG: Building QEMU commit {self.cmt}')
+    def _build(self, plt):
+        """Build the configured QEMU, giving up on failure.  Argument supplied
+           is 'plugin' or 'no-plugin'."""
+        dmess = 'DEBUG: Building QEMU'
+        self._log.debug(f'{dmess} commit {self.cmt} {plt} version')
         nprocs=str(multiprocessing.cpu_count())
         cmd = f'make -j {nprocs}'
         try:
@@ -162,7 +189,7 @@ class QEMUBuilder:
                 cmd,
                 shell=True,
                 executable='/bin/bash',
-                cwd=self.builddir,
+                cwd=self.builddir[plt],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=10 * self._args.get('timeout'),
@@ -170,26 +197,30 @@ class QEMUBuilder:
                 )
             self._log.debug(res.stdout.decode('utf-8'))
         except subprocess.TimeoutExpired as e:
+            emess = 'ERROR: Build of QEMU'
             self._log.error(
-                f'ERROR: Build of QEMU commit {self.cmt} timed out.')
+                f'{emess} commit {self.cmt} {plt} version timed out.')
             self._log.debug(e.stderr)
             sys.exit(1)
         except subprocess.CalledProcessError as e:
+            emess = 'ERROR: Build of QEMU'
             self._log.error(
-                f'ERROR: Build of QEMU commit {self.cmt} failed.')
+                f'{emess} commit {self.cmt} {plt} version failed.')
             self._log.debug(e.stderr)
             sys.exit(1)
 
-    def _install(self):
-        """Install the configured QEMU, giving up on failure"""
-        self._log.debug(f'DEBUG: Installing QEMU commit {self.cmt}')
+    def _install(self, plt):
+        """Install the configured QEMU, giving up on failure.  Argument supplied
+           is 'plugin' or 'no-plugin'."""
+        dmess = 'DEBUG: Installing QEMU'
+        self._log.debug(f'{dmess} commit {self.cmt} {plt} version.')
         cmd = 'make install'
         try:
             res = subprocess.run(
                 cmd,
                 shell=True,
                 executable='/bin/bash',
-                cwd=self.builddir,
+                cwd=self.builddir[plt],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 timeout=self._args.get('timeout'),
@@ -197,44 +228,52 @@ class QEMUBuilder:
                 )
             self._log.debug(res.stdout.decode('utf-8'))
         except subprocess.TimeoutExpired as e:
+            emess = 'ERROR: Install of QEMU'
             self._log.error(
-                f'ERROR: Install of QEMU commit {self.cmt} timed out.')
+                f'{emess} commit {self.cmt} {plt} version timed out.')
             self._log.debug(e.stderr)
             sys.exit(1)
         except subprocess.CalledProcessError as e:
+            emess = 'ERROR: Install of QEMU'
             self._log.error(
-                f'ERROR: Install of QEMU commit {self.cmt} failed.')
+                f'{emess} commit {self.cmt} {plt} version failed.')
             self._log.debug(e.stderr)
             sys.exit(1)
 
-    def _validate(self):
-        """Check the binaries exist in the install directory."""
-        q32=os.path.join(self.installdir, 'bin', 'qemu-riscv32')
-        q64=os.path.join(self.installdir, 'bin', 'qemu-riscv64')
+    def _validate(self, plt):
+        """Check the binaries exist in the install directory.  Argument
+           supplied is 'plugin' or 'no-plugin'."""
+        q32=os.path.join(self.installdir[plt], 'bin', 'qemu-riscv32')
+        q64=os.path.join(self.installdir[plt], 'bin', 'qemu-riscv64')
         for f in [q32, q64]:
             if not os.path.exists(f):
-                self._log.error(f'ERROR: {f} not installed.')
+                emess = f'ERROR: {f} not installed'
+                self._log.error(f'{emess} for commit {self.cmt} version {plt}.')
                 sys.exit(1)
 
-    def _build_qemu(self):
-        """Build and install an instance of QEMU.  This is always a clean
-           build.  Any failures terminate the program.
+    def _build_qemu(self, plt, do_checkout):
+        """Build and install an instance of QEMU.  First argument supplied
+           is 'plugin' or 'no-plugin', second is wether we need to checkout
+           the commit.  This is always a clean build.  Any failures terminate
+           the program.
 
            If no-build is requested, we check the binaries are there."""
         if self._args.get('build'):
-            self._checkout()
-            self._clean()
-            self._configure()
-            self._build()
-            self._install()
+            if do_checkout:
+                self._checkout()
+            self._clean(plt)
+            self._configure(plt)
+            self._build(plt)
+            self._install(plt)
         else:
-            self._validate()
+            self._validate(plt)
 
     def _find_qemu_plugin(self):
-        """Find the QEMU libinsn plugin from its build directory.  This moves
-           around depending on the specific QEMU version (sigh).  Return the
-           fully qualified plugin name, or None on failure."""
-        bd = self.builddir
+        """Find the QEMU libinsn plugin from its build directory.  This
+           directory  moves around depending on the specific QEMU version
+           (sigh).  Return the fully qualified plugin name, or None on
+           failure."""
+        bd = self.builddir['plugin']
         plugin_dirs = [
             os.path.join(bd, 'tests', 'plugin', 'libinsn.so'),
             os.path.join(bd, 'tests', 'tcg', 'plugins', 'libinsn.so'), ]
@@ -242,5 +281,4 @@ class QEMUBuilder:
             if os.path.exists(plugin):
                 return plugin
 
-        self._log.error('ERROR: QEMU plugin not found.')
         return None

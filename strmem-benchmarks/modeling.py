@@ -37,21 +37,19 @@ class Model:
        The configuration is defined by a tuple of the following
        - the QEMU commit being used
        - the benchmark
-       - the configuration (VLEN/LMUL or stdlib)
+       - the configuration (VLEN or stdlib)
 
        That configuration is then run as a single job for all the data sizes
        specified.  The point being that the benchmark must be built for the
-       configuration and LMUL/stdlib, but the size (and the VLEN if given) is a
+       configuration and stdlib, but the size (and the VLEN if given) is a
        dynamic argument to the program, not requiring a rebuild of the
        benchmark.
 
        Note however that because we treat QEMU commit and VLEN as part of the
        conf, we potentially may build multiple benchmark identical
-       executables, if we have configurations with the same LMUL but different
-       VLENs.  We consider this to be mostly not the case, and if it does, the
-       time taken to build a configuration is very small, so the duplication
-       is not expensive.
-    """
+       executables, if we have different VLENs.  We consider this to be mostly
+       not the case, and if it does, the time taken to build a configuration
+       is very small, so the duplication is not expensive."""
 
     # Tables of baseline iterations
     BASELINE_ITERS = { 'memchr'  :   300000,
@@ -83,7 +81,7 @@ class Model:
                              'strncpy' :  400000,
                              'strnlen' :  500000, }
 
-    def __init__(self, qb, bm, conf, args, log):
+    def __init__(self, qb, bm, vlen, args, log):
         """Constructor for the builder, which just records the configuration
            and creates the various files and directories."""
         self._qb = qb
@@ -92,17 +90,8 @@ class Model:
         self._bm = bm
         self._args = args
         self._log = log
-        if conf == 'stdlib':
-            # We need valid VLEN/LMUL, but they are not actually used.
-            self._stdlib = True
-            self._vlen = 128
-            self._lmul = 1
-            self.suffix = self._cmt + '-' + bm + '-' + 'stdlib'
-        else:
-            self._stdlib = False
-            self._vlen, self._lmul = conf.split('-')
-            self.suffix = self._cmt + '-' + bm + '-' + self._vlen + \
-                '-m' + self._lmul
+        self._vlen = vlen
+        self.suffix = self._cmt + '-' + bm + '-' + vlen
         self.builddir = os.path.join(args.get('strmemdir'), 'build',
                                      'bd-' + self.suffix)
         self._bmexe = os.path.join(
@@ -158,12 +147,13 @@ class Model:
             verify_flag=''
 
         sfsrc=self._args.get('sifivesrcdir')
-        if self._stdlib:
-            cmd = f'make SIFIVESRCDIR={sfsrc} BENCHMARK={self._bm} ' + \
-                  f'EXTRA_DEFS="-DSTANDARD_LIB {verify_flag}"'
+        if self._vlen == 'stdlib':
+            stdlibflag = '-DSTANDARD_LIB'
         else:
-            cmd = f'make LMUL={self._lmul} BENCHMARK={self._bm} ' + \
-                  f'SIFIVESRCDIR={sfsrc} EXTRA_DEFS="{verify_flag}"'
+            stdlibflag = ''
+        cmd = f'make SIFIVESRCDIR={sfsrc} BENCHMARK={self._bm} ' + \
+                  f'EXTRA_DEFS="{stdlibflag} {verify_flag}"'
+        self._log.debug(f'DEBUG: Build command for {self.suffix} is {cmd}')
         try:
             res = subprocess.run(
                 cmd,
@@ -196,7 +186,11 @@ class Model:
         return self.buildok
 
     def _read_icount(self, filename):
-        """Extract the instruction count from a file."""
+        """Extract the instruction count from a file.  The filename may be
+           None, in which case we return a result of None"""
+        if not filename:
+            return filename
+
         nlines = 0
         icnt = 0
         with open(filename, 'r', encoding="utf-8") as file:
@@ -219,29 +213,41 @@ class Model:
         tot_time = usr_time + sys_time
         return (tot_time, self._read_icount(cntf))
 
-    def _run_qemu(self, sz, iters):
-        """Run a single QEMU execution of the executable benchmark.  Result on
-           success is a tuple (icount, time), where "time" is the sum of user
-           and system time for the child process.  Results on failure is
-           None."""
-        try:
-            tmpf = tempfile.NamedTemporaryFile(
-                mode='w', prefix='icount-', dir=self._args.get('strmemdir'),
-                delete=False).name
-        except Exception as e:
-            estr= 'Unable to create temporary file'
-            ename = type(e).__name__
-            confstr = f'self._prefix, size={sz}, iters={iters}'
-            self._log.error(f'ERROR: {estr} for {confstr}: {ename}.')
-            return None
+    def _run_qemu(self, sz, iters, plt):
+        """Run a single QEMU execution of the executable benchmark. Arguments
+           are data size for the run, interations and plugin type.  Result on
+           success is a tuple (time, icount), where "time" is the sum of user
+           and system time for the child process and icount may be None if
+           plugins are not enabled.  Results on failure is None."""
+        if plt == 'plugin':
+            try:
+                tmpf = tempfile.NamedTemporaryFile(
+                    mode='w', prefix='icount-', dir=self._args.get('strmemdir'),
+                    delete=False).name
+            except Exception as e:
+                estr= 'Unable to create temporary file'
+                ename = type(e).__name__
+                confstr = f'self._prefix, size={sz}, iters={iters}'
+                self._log.error(f'ERROR: {estr} for {confstr}: {ename}.')
+                return None
+        else:
+            tmpf = None
 
         # Add QEMU to path
         currpath=os.environ['PATH']
-        os.environ['PATH'] = f'{self._qb.installdir}/bin:{currpath}'
+        os.environ['PATH'] = f'{self._qb.installdir[plt]}/bin:{currpath}'
         usage_start = resource.getrusage(resource.RUSAGE_CHILDREN)
-        cmd = f'qemu-riscv64 -cpu rv64,v=true,vlen={self._vlen} ' + \
-	      f'--d plugin -plugin {self._qemuplugin},inline=on ' + \
-              f'-D {tmpf} {self._bmexe} {sz} {iters}'
+        if self._vlen == 'stdlib':
+            vlenarg = '128'
+        else:
+            vlenarg = self._vlen
+        if plt == 'plugin':
+            plgargs = \
+                f'--d plugin -plugin {self._qemuplugin},inline=on -D {tmpf}'
+        else:
+            plgargs = ''
+        cmd = f'qemu-riscv64 -cpu rv64,v=true,vlen={vlenarg} ' + \
+	      f'{plgargs} {self._bmexe} {sz} {iters}'
         try:
             subprocess.run(
                 cmd,
@@ -254,7 +260,7 @@ class Model:
                 check=True,
                 )
         except subprocess.TimeoutExpired as e:
-            wmess = f'Benchmark run for {self.suffix}'
+            wmess = f'Benchmark run for {self.suffix} {plt} version'
             self._log.warning(
                 f'Warning: {wmess}, size={sz}, iters={iters} timed out.')
             self._log.debug(e.cmd)
@@ -262,7 +268,7 @@ class Model:
             self._log.debug(e.stderr)
             return None
         except subprocess.CalledProcessError as e:
-            wmess = f'Benchmark run for {self.suffix}'
+            wmess = f'Benchmark run for {self.suffix} {plt} version'
             self._log.warning(
                 f'Warning: {wmess}, size={sz}, iters={iters} failed.')
             self._log.debug(e.cmd)
@@ -273,31 +279,55 @@ class Model:
             usage_end = resource.getrusage(resource.RUSAGE_CHILDREN)
             return self._qemu_res(usage_start, usage_end, tmpf)
         finally:
-            try:
-                os.environ['PATH'] = f'{currpath}'
-                os.remove(tmpf)
-            except Exception as e:
-                self._log.debug('Debug: Unable to delete temporary {tmpf}')
+            if tmpf:
+                try:
+                    os.environ['PATH'] = f'{currpath}'
+                    os.remove(tmpf)
+                except Exception as e:
+                    self._log.debug('Debug: Unable to delete temporary {tmpf}')
 
-    def _run_one(self, sz, iters):
-        """Run the benchmark under QEMU for a single size.  We do a warmup run
-           and then a full run, and subtract the two to remove overhead.
+    def _run_one(self, sz, iters, plt):
+        """Run the benchmark under QEMU for a single size.  The plt argument
+           indicates whether to use QEMU with plugins enabled. We do a warmup
+           run and then a full run, and subtract the two to remove overhead.
            Return a tuple of (iters, time, icount) on success, or None on
-           failure."""
+           failure. icount will be None if we do not have plugins"""
         warmup_iters = self._args.get('warmup')
         tot_iters = warmup_iters + iters
-        res_warmup = self._run_qemu(sz, warmup_iters)
+        res_warmup = self._run_qemu(sz, warmup_iters, plt)
         if not res_warmup:
             return None
 
         t_warmup, icnt_warmup = res_warmup
-        res_tot = self._run_qemu(sz, tot_iters)
+        res_tot = self._run_qemu(sz, tot_iters, plt)
         if not res_tot:
             return None
 
         t_tot, icnt_tot = res_tot
 
-        return (iters, t_tot - t_warmup, icnt_tot - icnt_warmup)
+        if plt == 'plugin':
+            icnt_res = icnt_tot - icnt_warmup
+        else:
+            icnt_res = None
+        return (iters, t_tot - t_warmup, icnt_res)
+
+    def _run_one_full(self, sz, iters):
+        """Run the benchmark under QEMU for a single size, obtaining iteration
+           count using the plugin and timing using no plugin.  Return a tuple
+           of iterations, time and icount or None on failure."""
+        res = self._run_one(sz, iters, 'plugin')
+        if not res:
+            return None
+
+        iters = res[0]
+        icnt = res[2]
+
+        res = self._run_one(sz, iters, 'no-plugin')
+        if not res:
+            return None
+
+        time = res[1]
+        return (iters, time, icnt)
 
     def run(self):
         """Run the models for all the different sizes.  Return the list of
@@ -314,7 +344,7 @@ class Model:
             iters = Model.BASELINE_ITERS[self._bm]
         else:
             iters = Model.BASELINE_VERIF_ITERS[self._bm]
-        res = self._run_one(prev_sz, iters)
+        res = self._run_one_full(prev_sz, iters)
         if not res:
             return None
 
@@ -323,7 +353,7 @@ class Model:
 
         for sz in sizelist:
             iters = int(float(iters) * prev_sz / float(sz) * target_t / prev_t)
-            res = self._run_one(sz, iters)
+            res = self._run_one_full(sz, iters)
             if not res:
                 return None
             self.results[sz] = res
@@ -337,16 +367,17 @@ class Model:
         with open(self._resfile, 'w', newline='', encoding="utf-8") as csvf:
             csvwriter = csv.writer(csvf, dialect=csv.unix_dialect)
             # Write the header
-            csvwriter.writerow(['Benchmark', 'Iterations', 'VLEN', 'LMUL',
-                               'Std', 'Size', 'Icount', 'Time', 'Icnt/iter',
-                                'ns/inst'])
+            csvwriter.writerow(['Benchmark', 'Iterations', 'VLEN', 'Size',
+                                'Icount', 'Time', 'Icnt/iter', 'ns/inst',
+                                's/Miter'])
             # Write all the elements
             for sz, data in self.results.items():
                 iters, tim, icnt = data
                 icpi = float(icnt) / float(iters)
                 nspi = float(tim) * 1000000000.0 / float(icnt)
-                csvwriter.writerow([self._bm, iters, self._vlen, self._lmul,
-                                    self._stdlib, sz, icnt, tim, icpi, nspi])
+                spmi = float(tim) * 1000000.0 / float(iters)
+                csvwriter.writerow([self._bm, iters, self._vlen, sz, icnt,
+                                    tim, icpi, nspi, spmi])
 
 class ModelSet:
     """A class for all the model configurations we have to run."""
@@ -359,8 +390,8 @@ class ModelSet:
         self._model_list = []
         for qb in qemu_builds:
             for bm in args.get('bmlist'):
-                for conf in args.get('conflist'):
-                    self._model_list.append(Model(qb, bm, conf, args, log))
+                for vlen in args.get('vlenlist'):
+                    self._model_list.append(Model(qb, bm, vlen, args, log))
 
     def build(self):
         """Build all the model configurations concurrently.
@@ -393,9 +424,9 @@ class ModelSet:
                 else:
                     failures +=1
             except Exception as e:
-                emess = 'Building model'
+                emess = 'ERROR: Building model'
                 ename = type(e).__name__
-                self._log.error(f'ERROR: {emess}: {ename}.')
+                self._log.error(f'{emess}: {ename}.')
                 failures += 1
 
             print('.', end='', flush=True)
@@ -438,9 +469,9 @@ class ModelSet:
                 else:
                     failures +=1
             except Exception as e:
-                emess = f'running model config {m.suffix}'
+                emess = f'ERROR: running model config {m.suffix}'
                 ename = type(e).__name__
-                self._log.error(f'ERROR: {emess}: {ename}.')
+                self._log.error(f'{emess}: {ename}.')
                 failures += 1
 
             print('.', end='', flush=True)

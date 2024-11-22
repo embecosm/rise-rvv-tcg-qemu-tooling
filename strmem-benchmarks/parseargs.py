@@ -57,12 +57,8 @@ class ParseArgs:
                           729,  1024,  1331,  2048,  2401,  3125,
                          4096,  6561,  8192, 14641, 15625, 16384,
                         16807, 19683, 32768, 59049, 65536, 78125,]
-        conflist_dft = ['stdlib', '128-1', '1024-8']
-        conflist_choices = ['stdlib',
-                             '128-1',  '128-2',  '128-4',  '128-8',
-                             '256-1',  '256-2',  '256-4',  '256-8',
-                             '512-1',  '512-2',  '512-4',  '512-8',
-                            '1024-1', '1024-2', '1024-4', '1024-8',]
+        vlenlist_dft = ['stdlib', '128', '1024']
+        vlenlist_choices = ['stdlib', '128', '256', '512', '1024',]
         # Useful default directories
         strmemdir_dft = os.path.dirname(os.path.abspath(sys.argv[0]))
         tooldir_dft = os.path.dirname(strmemdir_dft)
@@ -209,13 +205,13 @@ class ParseArgs:
             help='Sizes of data to use (default: %(default)s)',
         )
         parser.add_argument(
-            '--conflist',
+            '--vlenlist',
             type=str,
-            default=conflist_dft,
+            default=vlenlist_dft,
             nargs='*',
-            choices=conflist_choices,
-            metavar='VLEN-LMUL',
-            help='VLEN-LMUL configurations to run (default: %(default)s)',
+            choices=vlenlist_choices,
+            metavar='VLEN',
+            help='VLEN configurations to run (default: %(default)s)',
         )
         parser.add_argument(
             '--log-prefix',
