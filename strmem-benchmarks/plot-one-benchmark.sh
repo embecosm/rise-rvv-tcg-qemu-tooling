@@ -205,11 +205,11 @@ then
 fi
 
 # Work out clean Y ranges.
-scalar_nspi_range=$(range_for_col "ns/inst" "${old_scalar_csv}" \
+scalar_spmi_range=$(range_for_col "s/Miter" "${old_scalar_csv}" \
 				  "${new_scalar_csv}")
-small_vector_nspi_range=$(range_for_col "ns/inst" "${old_small_vector_csv}" \
+small_vector_spmi_range=$(range_for_col "s/Miter" "${old_small_vector_csv}" \
 					"${new_small_vector_csv}")
-large_vector_nspi_range=$(range_for_col "ns/inst" "${old_large_vector_csv}" \
+large_vector_spmi_range=$(range_for_col "s/Miter" "${old_large_vector_csv}" \
 					"${new_large_vector_csv}")
 y1=$(range_for_col "Icnt/iter" "${old_scalar_csv}" \
 		   "${new_scalar_csv}")
@@ -229,9 +229,9 @@ gnuplot -e "benchmark='${benchmark}'" \
 	-e "new_small_vector_csv='${new_small_vector_csv}'" \
 	-e "old_large_vector_csv='${old_large_vector_csv}'" \
 	-e "new_large_vector_csv='${new_large_vector_csv}'" \
-	-e "scalar_nspi_range='${scalar_nspi_range}'" \
-	-e "small_vector_nspi_range='${small_vector_nspi_range}'" \
-	-e "large_vector_nspi_range='${large_vector_nspi_range}'" \
+	-e "scalar_nspi_range='${scalar_spmi_range}'" \
+	-e "small_vector_nspi_range='${small_vector_spmi_range}'" \
+	-e "large_vector_nspi_range='${large_vector_spmi_range}'" \
 	-e "ipi_range='${ipi_range}'" \
         plot-one-benchmark.gnuplot
 
