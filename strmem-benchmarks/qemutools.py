@@ -182,7 +182,7 @@ class QEMUBuilder:
            is 'plugin' or 'no-plugin'."""
         dmess = 'DEBUG: Building QEMU'
         self._log.debug(f'{dmess} commit {self.cmt} {plt} version')
-        nprocs=str(multiprocessing.cpu_count())
+        nprocs=str(self._args.get('jobs'))
         cmd = f'make -j {nprocs}'
         try:
             res = subprocess.run(

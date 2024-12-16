@@ -13,6 +13,7 @@ A module to parse arguments for the SiFive benchmarks
 """
 
 import argparse
+import multiprocessing
 import os
 import os.path
 import sys
@@ -251,6 +252,13 @@ class ParseArgs:
             action='store_true',
             default=False,
             help='Only prepare a report from existing results (default: %(default)s)'
+        )
+        parser.add_argument(
+            '--jobs', '-j',
+            type=int,
+            default=multiprocessing.cpu_count(),
+            metavar='PROCS',
+            help='Number of parallel processes to use (default: %(default)s)',
         )
         parser.add_argument(
             '--timeout',

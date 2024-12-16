@@ -404,7 +404,8 @@ class ModelSet:
         resf = {}
         # Launch all the builds
         self._log.info('Building all model configurations')
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+                max_workers=self._args.get('jobs')) as executor:
             for m in self._model_list:
                 resf[m] = executor.submit (m.build)
 
@@ -449,7 +450,8 @@ class ModelSet:
         # Launch all the builds
         self._log.info('Running all model configurations')
         resf = {}
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ProcessPoolExecutor(
+                max_workers=self._args.get('jobs')) as executor:
             for m in self._model_list:
                 resf[m] = executor.submit (m.run)
 
