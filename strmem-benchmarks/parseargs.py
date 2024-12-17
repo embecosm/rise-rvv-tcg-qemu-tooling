@@ -248,6 +248,14 @@ class ParseArgs:
             help='Results directory (default results-<DATESTAMP>)',
         )
         parser.add_argument(
+            '--resdirlist',
+            type=str,
+            default=None,
+            nargs='*',
+            metavar='DIR',
+            help='List of results directories (default %(default)s)',
+        )
+        parser.add_argument(
             '--report-only',
             action='store_true',
             default=False,
