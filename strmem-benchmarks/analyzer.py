@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import os.path
 import statistics
+import sys
 
 class RunData:
     """A class to hold one row of CSV data."""
@@ -266,7 +267,8 @@ class GroupAnalyzer:
         ax.set_xlabel('Data size/bytes')
         ax.set_ylabel('Speedup')
         ax.grid(which='major', axis='y')
-        ax.set_ylim(0, 1.5)
+        # This is rather hard-coded for now!
+        ax.set_ylim(0, 4.0)
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles, labels, loc='upper right')
         qid = self._args.get('qemulist')[1]

@@ -7,5 +7,6 @@ build/
 __pycache__/
 # Generated reports
 report-20*.pdf
+*-speedup.pdf
 # Intermediate temporary files
 icount-*
