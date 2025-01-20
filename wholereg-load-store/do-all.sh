@@ -15,7 +15,15 @@ Usage ./do-all.sh                     : Benchmark whole word load/store.
                                         program (default 10000000)
                    [--nstats <count>] : Number of times to repeat each test
                                         for statistical analysis (default 10).
+                   [--base <id>]      : Commit of the QEMU version to use as
+                                        baseline
+                   [--test <id>]      : Commit of the QEMU version to use be
+                                        tested against the baseline
                    [--help]           : Print this message and exit
+
+The QMEU are assumed to have been built without plugins enabled, with the
+binary installed in ../../install/qemu-${qid}-no-plugin/bin, where qid is the
+argument to --base or --test.
 EOF
 }
 
@@ -114,8 +122,6 @@ stinstr="vs1r vs2r vs4r vs8r"
 
 vlenlist="128 256 512 1024"
 
-qemubase="6528013b5f"
-qemutest="db95037b42"
 tmpf=$(mktemp whole-word-load-store-XXXXXX.txt)
 
 ldresf="ldres.csv"
@@ -124,6 +130,8 @@ stresf="stres.csv"
 # Defaults for variables
 nloops=10000000
 nstats=10
+qemubase="6528013b5f"
+qemutest="db95037b42"
 
 # Parse command line options
 set +u
@@ -137,6 +145,14 @@ until
       --nstats)
 	  shift
 	  nstats="$1"
+	  ;;
+      --base)
+	  shift
+	  qemubase="$1"
+	  ;;
+      --test)
+	  shift
+	  qemutest="$1"
 	  ;;
       --help)
 	  usage
