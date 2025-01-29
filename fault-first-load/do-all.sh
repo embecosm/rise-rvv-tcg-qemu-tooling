@@ -10,16 +10,18 @@ set -u
 # Produce help message
 usage () {
     cat <<EOF
-Usage ./do-all.sh                     : Benchmark whole word load/store.
-                   [--nloops <count>] : Number of iterations of the test
-                                        program (default 10000000)
-                   [--nstats <count>] : Number of times to repeat each test
-                                        for statistical analysis (default 10).
-                   [--base <id>]      : Commit of the QEMU version to use as
-                                        baseline
-                   [--test <id>]      : Commit of the QEMU version to use be
-                                        tested against the baseline
-                   [--help]           : Print this message and exit
+Usage ./do-all.sh                      : Benchmark whole word load/store.
+                   [--nloops <count>]  : Number of iterations of the test
+                                         program (default 10000000)
+                   [--nstats <count>]  : Number of times to repeat each test
+                                         for statistical analysis (default 10)
+                   [--ldcount <count>] : Now many duplicate of the instruction
+                                         we are counting (default 10)
+                   [--base <id>]       : Commit of the QEMU version to use as
+                                         baseline
+                   [--test <id>]       : Commit of the QEMU version to use be
+                                         tested against the baseline
+                   [--help]            : Print this message and exit
 
 The QMEU are assumed to have been built without plugins enabled, with the
 binary installed in ../../install/qemu-${qid}-no-plugin/bin, where qid is the
@@ -55,7 +57,7 @@ runone() {
     PATH=../../install/qemu-${qid}-no-plugin/bin:${OLDPATH}
     (time qemu-riscv64 -cpu rv64,v=true,vlen=${vl} ${i}.exe) \
 	> ${tmpf} 2>&1
-     local u=$(sed -n -e 's/user[[:space:]]*0m\(.\+\)s$/\1/p' < ${tmpf})
+    local u=$(sed -n -e 's/user[[:space:]]*0m\(.\+\)s$/\1/p' < ${tmpf})
     local s=$(sed -n -e 's/sys[[:space:]]*0m\(.\+\)s$/\1/p' < ${tmpf})
     PATH=${OLDPATH}
     t=$(echo "print(${u} + ${s})" | python3)
@@ -79,16 +81,25 @@ runit() {
 	buildit ${i} 1 ${lmul}
 	local tbase1=$(runone ${vl} ${i} ${qemubase})
 	local ttest1=$(runone ${vl} ${i} ${qemutest})
-	# 11 instruction runs for base and test
-	buildit ${i} 11 ${lmul}
-	local tbase11=$(runone ${vl} ${i} ${qemubase})
-	local ttest11=$(runone ${vl} ${i} ${qemutest})
+	# ldcount + 1 instruction runs for base and test
+	ninst=$((ldcount + 1))
+	buildit ${i} ${ninst} ${lmul}
+	local tbasen=$(runone ${vl} ${i} ${qemubase})
+	local ttestn=$(runone ${vl} ${i} ${qemutest})
 	# Calculate net instructions times for base and test
-	local tdbase=$(echo "print(${tbase11} - ${tbase1})" | python3)
-	local tdtest=$(echo "print(${ttest11} - ${ttest1})" | python3)
+	local tdbase=$(echo "print(${tbasen} - ${tbase1})" | python3)
+	local tdtest=$(echo "print(${ttestn} - ${ttest1})" | python3)
 	res=$(echo "print(${tdbase} / ${tdtest} - 1 \
                           if (${tdbase} > 0) and (${tdtest} > 0) else '')" \
 		  | python3)
+	restxt="GOOD:"
+	if [[ "x${res}" == "x" ]]
+	then
+	    restxt="BAD:"
+	fi
+	printf "%-5s %-7s %2s %4d %.3f %.3f\n" "${restxt}" "${i}" "${lmul}" \
+	       ${vl} ${tdbase} ${tdtest} >> ${logf}
+
     done
     printf "%.3f" ${res}
 }
@@ -103,12 +114,14 @@ vlenlist="128 256 512 1024"
 lmullist="m1 m2 m4 m8"
 
 tmpf=$(mktemp fault-first-load-XXXXXX.txt)
+logf=rundata.log
 
 ldresf="ldres.csv"
 
 # Defaults for variables
 nloops=10000000
 nstats=10
+ldcount=10
 qemubase="6528013b5f"
 qemutest="db95037b42"
 
@@ -124,6 +137,10 @@ until
       --nstats)
 	  shift
 	  nstats="$1"
+	  ;;
+      --ldcount)
+	  shift
+	  ldcount="$1"
 	  ;;
       --base)
 	  shift
@@ -150,6 +167,8 @@ do
   shift
 done
 set -u
+
+rm -f ${logf}
 
 # All the load instructions
 echo "Fault only first load instructions"

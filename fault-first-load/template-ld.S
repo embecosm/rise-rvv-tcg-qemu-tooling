@@ -26,9 +26,9 @@ main:
 	vsetvli t2, t1, ELEM, LMUL, ta, ma
 	.rept	LD_CNT
 #if DOMASK
-	VLDOP.v	v1, (a0), v0.t
+	VLDOP.v	v8, (a0), v0.t
 #else
-	VLDOP.v	v1, (a0)
+	VLDOP.v	v8, (a0)
 #endif
 	.endr
 	addi	t0, t0, -1
